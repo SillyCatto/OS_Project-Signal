@@ -140,14 +140,14 @@ T17     Handler ret                     User code           Return (simplified)
 ```
 USER SPACE MEMORY:
 ┌──────────────────────────────────────────────────┐
-│ .text section                                     │
+│ .text section                                    │
 │ 0x40001000: main()                               │
-│    ...                                            │
+│    ...                                           │
 │ 0x40005678: signal_handler:                      │
-│             push ebp                              │
-│             mov ebp, esp                          │
-│             ...                                   │
-│             ret                                   │
+│             push ebp                             │
+│             mov ebp, esp                         │
+│             ...                                  │
+│             ret                                  │
 └──────────────────────────────────────────────────┘
 
 KERNEL SPACE (TCB for this process):
