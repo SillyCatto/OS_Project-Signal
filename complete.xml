@@ -1,0 +1,581 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<contexto generated="2025-04-11T19:35:42Z">
+  <summary>
+    <totalFiles>297</totalFiles>
+    <totalFolders>59</totalFolders>
+    <totalSize>1728230</totalSize>
+    <mostRecentFile>D:\4_Projects\mcertikos\kern\trap\TSyscall\TSyscall.c</mostRecentFile>
+    <mostRecentFileModified>2025-04-11T19:34:18Z</mostRecentFileModified>
+  </summary>
+  <folder name="mcertikos" path="D:\4_Projects\mcertikos" fileCount="8" totalFileCount="297">
+    <readme>List here the name of your partner, answers to the questions in the "Question" section of the lab, the brief description of what you have implemented, and anything else you would like us to know.
+bs744, hz322
+
+We evenly contributed to this project, pair programming.
+
+In part1, we implemented a IPC scheme. Details are:
+kern/lib/ipc.c
+kern/lib/ipc.h
+ker/trap/TSyscall/TSyscall.c
+
+When a msg is sent to process B from process A, process A stores the recv_pid, length and start address of message in msgBlock. Wakeup all threads sleeping on its send channel and sleep itself on its own recv channel.
+When a msg is recv by process B sent from process A, process B sleeps on process A's send channel and then wakeup all threads sleeping on process A's recv channel. Process B then copy msg from the address space of process A into kernel space and then copy it out from kernel space to user space of process B.
+
+
+
+In part2, we implemeted a shell that support the basic operations like cp(-r), mv, rm(-r), etc.
+In this part, we create a user process called shell. We launch shell when kernel starts. Most of the operations are implemented in user level. for example:
+1)cp/cp -r
+2)mv
+3)rm/rm -r
+4)cd
+
+
+Other operations are implemented in kernel level, because it will use some inode related system calls. For example:
+1)ls
+2)pwd
+3)mkdir
+4)touch
+5)write
+6)read
+7)append
+
+In this part, we find it much easy to implement some operations in user level rather than kernel level, because it will leverage a lot of apis that we implemented in the previous lab. This is more easy to debug. For example, we tried to implement cp/cp-r in kernel mode, however, we find it rather tricky to deal with inode locks. Sometimes it will get stuck. We then reimplemented all these operations in user level, and this makes things much easier to do.
+
+
+We created 28 test cases for this project. Our program passed all of them.
+Test cases are written in user/shell/shell.c
+Please set the value of  variable 'mode' to 1,2,0 in order to enter different test mode.
+You need to make the project again to change test mode.
+
+
+</readme>
+    <files>
+      <file name=".gdbinit.tmpl" path="D:\4_Projects\mcertikos\.gdbinit.tmpl" type=".tmpl" size="1207" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:48Z" accessed="2025-04-11T19:28:35Z" />
+      <file name=".gitignore" path="D:\4_Projects\mcertikos\.gitignore" type=".gitignore" size="6" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:48Z" accessed="2025-04-11T19:28:35Z" />
+      <file name="certikos_disk.img" path="D:\4_Projects\mcertikos\certikos_disk.img" type=".img" size="524288" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T18:27:49Z" />
+      <file name="fix_1.md" path="D:\4_Projects\mcertikos\fix_1.md" type=".md" size="1808" created="2025-04-11T18:55:31Z" modified="2025-04-11T18:59:34Z" accessed="2025-04-11T18:59:34Z" />
+      <file name="instruction.md" path="D:\4_Projects\mcertikos\instruction.md" type=".md" size="0" created="2025-04-11T18:38:45Z" modified="2025-04-11T18:38:45Z" accessed="2025-04-11T18:38:45Z" />
+      <file name="Makefile" path="D:\4_Projects\mcertikos\Makefile" type="" size="4467" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:48Z" accessed="2025-04-11T19:28:35Z" />
+      <file name="make_image.py" path="D:\4_Projects\mcertikos\make_image.py" type=".py" size="1833" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+      <file name="README.md" path="D:\4_Projects\mcertikos\README.md" type=".md" size="2092" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:48Z" accessed="2025-04-11T19:28:35Z" />
+    </files>
+    <folder name="boot" path="D:\4_Projects\mcertikos\boot" fileCount="1" totalFileCount="9">
+      <files>
+        <file name="Makefile.inc" path="D:\4_Projects\mcertikos\boot\Makefile.inc" type=".inc" size="774" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+      </files>
+      <folder name="boot0" path="D:\4_Projects\mcertikos\boot\boot0" fileCount="2" totalFileCount="2">
+        <files>
+          <file name="boot0.S" path="D:\4_Projects\mcertikos\boot\boot0\boot0.S" type=".s" size="2093" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\boot\boot0\Makefile.inc" type=".inc" size="472" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+      <folder name="boot1" path="D:\4_Projects\mcertikos\boot\boot1" fileCount="6" totalFileCount="6">
+        <files>
+          <file name="boot1.S" path="D:\4_Projects\mcertikos\boot\boot1\boot1.S" type=".s" size="3740" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="boot1lib.c" path="D:\4_Projects\mcertikos\boot\boot1\boot1lib.c" type=".c" size="2912" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="boot1lib.h" path="D:\4_Projects\mcertikos\boot\boot1\boot1lib.h" type=".h" size="4774" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="boot1main.c" path="D:\4_Projects\mcertikos\boot\boot1\boot1main.c" type=".c" size="1786" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="exec_kernel.S" path="D:\4_Projects\mcertikos\boot\boot1\exec_kernel.S" type=".s" size="165" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\boot\boot1\Makefile.inc" type=".inc" size="780" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+    </folder>
+    <folder name="kern" path="D:\4_Projects\mcertikos\kern" fileCount="2" totalFileCount="225">
+      <files>
+        <file name="config.mk" path="D:\4_Projects\mcertikos\kern\config.mk" type=".mk" size="7705" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\Makefile.inc" type=".inc" size="2082" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+      </files>
+      <folder name="dev" path="D:\4_Projects\mcertikos\kern\dev" fileCount="32" totalFileCount="36">
+        <files>
+          <file name="acpi.c" path="D:\4_Projects\mcertikos\kern\dev\acpi.c" type=".c" size="2907" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="acpi.h" path="D:\4_Projects\mcertikos\kern\dev\acpi.h" type=".h" size="7432" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="console.c" path="D:\4_Projects\mcertikos\kern\dev\console.c" type=".c" size="1961" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:24:37Z" accessed="2025-04-11T19:24:37Z" />
+          <file name="console.h" path="D:\4_Projects\mcertikos\kern\dev\console.h" type=".h" size="271" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="devinit.c" path="D:\4_Projects\mcertikos\kern\dev\devinit.c" type=".c" size="1690" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="devinit.h" path="D:\4_Projects\mcertikos\kern\dev\devinit.h" type=".h" size="203" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="idt.S" path="D:\4_Projects\mcertikos\kern\dev\idt.S" type=".s" size="3903" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="intr.c" path="D:\4_Projects\mcertikos\kern\dev\intr.c" type=".c" size="5241" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:18:10Z" accessed="2025-04-11T19:18:10Z" />
+          <file name="intr.h" path="D:\4_Projects\mcertikos\kern\dev\intr.h" type=".h" size="2875" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="ioapic.c" path="D:\4_Projects\mcertikos\kern\dev\ioapic.c" type=".c" size="2775" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="ioapic.h" path="D:\4_Projects\mcertikos\kern\dev\ioapic.h" type=".h" size="1342" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="keyboard.c" path="D:\4_Projects\mcertikos\kern\dev\keyboard.c" type=".c" size="4415" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:03:25Z" accessed="2025-04-11T19:03:25Z" />
+          <file name="keyboard.h" path="D:\4_Projects\mcertikos\kern\dev\keyboard.h" type=".h" size="3539" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="lapic.c" path="D:\4_Projects\mcertikos\kern\dev\lapic.c" type=".c" size="6514" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="lapic.h" path="D:\4_Projects\mcertikos\kern\dev\lapic.h" type=".h" size="4937" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\dev\Makefile.inc" type=".inc" size="1056" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:49Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="mboot.c" path="D:\4_Projects\mcertikos\kern\dev\mboot.c" type=".c" size="5717" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="mboot.h" path="D:\4_Projects\mcertikos\kern\dev\mboot.h" type=".h" size="2210" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="mptable.h" path="D:\4_Projects\mcertikos\kern\dev\mptable.h" type=".h" size="2292" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="pcpu_mp.c" path="D:\4_Projects\mcertikos\kern\dev\pcpu_mp.c" type=".c" size="12190" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="pcpu_mp.h" path="D:\4_Projects\mcertikos\kern\dev\pcpu_mp.h" type=".h" size="465" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="pcpu_mp_intro.h" path="D:\4_Projects\mcertikos\kern\dev\pcpu_mp_intro.h" type=".h" size="1380" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="pic.c" path="D:\4_Projects\mcertikos\kern\dev\pic.c" type=".c" size="4587" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="pic.h" path="D:\4_Projects\mcertikos\kern\dev\pic.h" type=".h" size="637" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="serial.c" path="D:\4_Projects\mcertikos\kern\dev\serial.c" type=".c" size="3407" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="serial.h" path="D:\4_Projects\mcertikos\kern\dev\serial.h" type=".h" size="721" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="timer.c" path="D:\4_Projects\mcertikos\kern\dev\timer.c" type=".c" size="1306" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="timer.h" path="D:\4_Projects\mcertikos\kern\dev\timer.h" type=".h" size="334" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="tsc.c" path="D:\4_Projects\mcertikos\kern\dev\tsc.c" type=".c" size="2476" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="tsc.h" path="D:\4_Projects\mcertikos\kern\dev\tsc.h" type=".h" size="278" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="video.c" path="D:\4_Projects\mcertikos\kern\dev\video.c" type=".c" size="2519" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="video.h" path="D:\4_Projects\mcertikos\kern\dev\video.h" type=".h" size="6866" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+        <folder name="disk" path="D:\4_Projects\mcertikos\kern\dev\disk" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="ide.c" path="D:\4_Projects\mcertikos\kern\dev\disk\ide.c" type=".c" size="3437" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:18:48Z" accessed="2025-04-11T19:18:48Z" />
+            <file name="ide.h" path="D:\4_Projects\mcertikos\kern\dev\disk\ide.h" type=".h" size="448" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="ioapic.c" path="D:\4_Projects\mcertikos\kern\dev\disk\ioapic.c" type=".c" size="2192" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="picirq.c" path="D:\4_Projects\mcertikos\kern\dev\disk\picirq.c" type=".c" size="2389" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+      </folder>
+      <folder name="fs" path="D:\4_Projects\mcertikos\kern\fs" fileCount="22" totalFileCount="22">
+        <files>
+          <file name="block.c" path="D:\4_Projects\mcertikos\kern\fs\block.c" type=".c" size="1552" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="block.h" path="D:\4_Projects\mcertikos\kern\fs\block.h" type=".h" size="618" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="bufcache.c" path="D:\4_Projects\mcertikos\kern\fs\bufcache.c" type=".c" size="3476" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="bufcache.h" path="D:\4_Projects\mcertikos\kern\fs\bufcache.h" type=".h" size="1441" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="dinode.h" path="D:\4_Projects\mcertikos\kern\fs\dinode.h" type=".h" size="1192" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="dir.c" path="D:\4_Projects\mcertikos\kern\fs\dir.c" type=".c" size="2079" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="dir.h" path="D:\4_Projects\mcertikos\kern\fs\dir.h" type=".h" size="501" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="fcntl.h" path="D:\4_Projects\mcertikos\kern\fs\fcntl.h" type=".h" size="96" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="file.c" path="D:\4_Projects\mcertikos\kern\fs\file.c" type=".c" size="2851" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="file.h" path="D:\4_Projects\mcertikos\kern\fs\file.h" type=".h" size="1030" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="inode.c" path="D:\4_Projects\mcertikos\kern\fs\inode.c" type=".c" size="8272" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="inode.h" path="D:\4_Projects\mcertikos\kern\fs\inode.h" type=".h" size="4839" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="log.c" path="D:\4_Projects\mcertikos\kern\fs\log.c" type=".c" size="4807" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="log.h" path="D:\4_Projects\mcertikos\kern\fs\log.h" type=".h" size="1513" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\fs\Makefile.inc" type=".inc" size="612" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="mkfs.c" path="D:\4_Projects\mcertikos\kern\fs\mkfs.c" type=".c" size="6234" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="params.h" path="D:\4_Projects\mcertikos\kern\fs\params.h" type=".h" size="616" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="path.c" path="D:\4_Projects\mcertikos\kern\fs\path.c" type=".c" size="3367" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="path.h" path="D:\4_Projects\mcertikos\kern\fs\path.h" type=".h" size="84" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:50Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="stat.h" path="D:\4_Projects\mcertikos\kern\fs\stat.h" type=".h" size="427" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="sysfile.c" path="D:\4_Projects\mcertikos\kern\fs\sysfile.c" type=".c" size="12401" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="sysfile.h" path="D:\4_Projects\mcertikos\kern\fs\sysfile.h" type=".h" size="382" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+      <folder name="init" path="D:\4_Projects\mcertikos\kern\init" fileCount="4" totalFileCount="4">
+        <files>
+          <file name="boot_ap.S" path="D:\4_Projects\mcertikos\kern\init\boot_ap.S" type=".s" size="934" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="entry.S" path="D:\4_Projects\mcertikos\kern\init\entry.S" type=".s" size="1027" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="init.c" path="D:\4_Projects\mcertikos\kern\init\init.c" type=".c" size="2101" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\init\Makefile.inc" type=".inc" size="831" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+      <folder name="lib" path="D:\4_Projects\mcertikos\kern\lib" fileCount="36" totalFileCount="36">
+        <files>
+          <file name="buf.h" path="D:\4_Projects\mcertikos\kern\lib\buf.h" type=".h" size="432" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="debug.c" path="D:\4_Projects\mcertikos\kern\lib\debug.c" type=".c" size="2049" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:24:19Z" accessed="2025-04-11T19:24:19Z" />
+          <file name="debug.h" path="D:\4_Projects\mcertikos\kern\lib\debug.h" type=".h" size="1444" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="dprintf.c" path="D:\4_Projects\mcertikos\kern\lib\dprintf.c" type=".c" size="1023" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="elf.c" path="D:\4_Projects\mcertikos\kern\lib\elf.c" type=".c" size="1975" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="elf.h" path="D:\4_Projects\mcertikos\kern\lib\elf.h" type=".h" size="1473" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="gcc.h" path="D:\4_Projects\mcertikos\kern\lib\gcc.h" type=".h" size="663" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="ipc.c" path="D:\4_Projects\mcertikos\kern\lib\ipc.c" type=".c" size="2707" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="ipc.h" path="D:\4_Projects\mcertikos\kern\lib\ipc.h" type=".h" size="593" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="kstack.c" path="D:\4_Projects\mcertikos\kern\lib\kstack.c" type=".c" size="353" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="kstack.h" path="D:\4_Projects\mcertikos\kern\lib\kstack.h" type=".h" size="1223" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\lib\Makefile.inc" type=".inc" size="836" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="monitor.c" path="D:\4_Projects\mcertikos\kern\lib\monitor.c" type=".c" size="3242" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:24:29Z" accessed="2025-04-11T19:24:29Z" />
+          <file name="monitor.h" path="D:\4_Projects\mcertikos\kern\lib\monitor.h" type=".h" size="593" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="pmap.c" path="D:\4_Projects\mcertikos\kern\lib\pmap.c" type=".c" size="2343" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="pmap.h" path="D:\4_Projects\mcertikos\kern\lib\pmap.h" type=".h" size="365" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="printf.c" path="D:\4_Projects\mcertikos\kern\lib\printf.c" type=".c" size="413" created="2025-04-11T19:24:49Z" modified="2025-04-11T19:24:54Z" accessed="2025-04-11T19:24:54Z" />
+          <file name="printfmt.c" path="D:\4_Projects\mcertikos\kern\lib\printfmt.c" type=".c" size="4373" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="printfmt.h" path="D:\4_Projects\mcertikos\kern\lib\printfmt.h" type=".h" size="268" created="2025-04-11T19:22:14Z" modified="2025-04-11T19:22:18Z" accessed="2025-04-11T19:22:18Z" />
+          <file name="queue.h" path="D:\4_Projects\mcertikos\kern\lib\queue.h" type=".h" size="7179" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="seg.c" path="D:\4_Projects\mcertikos\kern\lib\seg.c" type=".c" size="4293" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:03:57Z" accessed="2025-04-11T19:03:57Z" />
+          <file name="seg.h" path="D:\4_Projects\mcertikos\kern\lib\seg.h" type=".h" size="6128" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="signal.h" path="D:\4_Projects\mcertikos\kern\lib\signal.h" type=".h" size="1248" created="2025-04-11T18:40:34Z" modified="2025-04-11T18:59:07Z" accessed="2025-04-11T18:59:07Z" />
+          <file name="spinlock.c" path="D:\4_Projects\mcertikos\kern\lib\spinlock.c" type=".c" size="2646" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="spinlock.h" path="D:\4_Projects\mcertikos\kern\lib\spinlock.h" type=".h" size="927" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="stdarg.h" path="D:\4_Projects\mcertikos\kern\lib\stdarg.h" type=".h" size="327" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="string.c" path="D:\4_Projects\mcertikos\kern\lib\string.c" type=".c" size="2940" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:25:01Z" accessed="2025-04-11T19:25:01Z" />
+          <file name="string.h" path="D:\4_Projects\mcertikos\kern\lib\string.h" type=".h" size="547" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="syscall.c" path="D:\4_Projects\mcertikos\kern\lib\syscall.c" type=".c" size="837" created="2025-04-11T18:41:09Z" modified="2025-04-11T18:58:03Z" accessed="2025-04-11T18:58:03Z" />
+          <file name="syscall.h" path="D:\4_Projects\mcertikos\kern\lib\syscall.h" type=".h" size="3094" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:41:02Z" accessed="2025-04-11T18:41:02Z" />
+          <file name="thread.h" path="D:\4_Projects\mcertikos\kern\lib\thread.h" type=".h" size="746" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:58:03Z" accessed="2025-04-11T18:58:03Z" />
+          <file name="trap.h" path="D:\4_Projects\mcertikos\kern\lib\trap.h" type=".h" size="1268" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="types.c" path="D:\4_Projects\mcertikos\kern\lib\types.c" type=".c" size="295" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="types.h" path="D:\4_Projects\mcertikos\kern\lib\types.h" type=".h" size="1490" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="x86.c" path="D:\4_Projects\mcertikos\kern\lib\x86.c" type=".c" size="5058" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="x86.h" path="D:\4_Projects\mcertikos\kern\lib\x86.h" type=".h" size="5352" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:51Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+      <folder name="mm" path="D:\4_Projects\mcertikos\kern\mm" fileCount="2" totalFileCount="2">
+        <files>
+          <file name="pmm.c" path="D:\4_Projects\mcertikos\kern\mm\pmm.c" type=".c" size="382" created="2025-04-11T19:25:14Z" modified="2025-04-11T19:25:19Z" accessed="2025-04-11T19:25:19Z" />
+          <file name="vmm.c" path="D:\4_Projects\mcertikos\kern\mm\vmm.c" type=".c" size="1" created="2025-04-11T19:25:32Z" modified="2025-04-11T19:25:32Z" accessed="2025-04-11T19:25:32Z" />
+        </files>
+      </folder>
+      <folder name="pcpu" path="D:\4_Projects\mcertikos\kern\pcpu" fileCount="1" totalFileCount="9">
+        <files>
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\pcpu\Makefile.inc" type=".inc" size="118" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+        <folder name="PCPUInit" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUInit" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUInit\export.h" type=".h" size="160" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUInit\import.h" type=".h" size="697" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUInit\Makefile.inc" type=".inc" size="453" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PCPUInit.c" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUInit\PCPUInit.c" type=".c" size="756" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="PCPUIntro" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUIntro" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUIntro\export.h" type=".h" size="619" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUIntro\import.h" type=".h" size="357" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUIntro\Makefile.inc" type=".inc" size="462" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PCPUIntro.c" path="D:\4_Projects\mcertikos\kern\pcpu\PCPUIntro\PCPUIntro.c" type=".c" size="1623" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:02:06Z" accessed="2025-04-11T19:02:06Z" />
+          </files>
+        </folder>
+      </folder>
+      <folder name="pmm" path="D:\4_Projects\mcertikos\kern\pmm" fileCount="1" totalFileCount="20">
+        <files>
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\pmm\Makefile.inc" type=".inc" size="208" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+        <folder name="MATInit" path="D:\4_Projects\mcertikos\kern\pmm\MATInit" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\pmm\MATInit\export.h" type=".h" size="158" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\pmm\MATInit\import.h" type=".h" size="1595" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\pmm\MATInit\Makefile.inc" type=".inc" size="491" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MATInit.c" path="D:\4_Projects\mcertikos\kern\pmm\MATInit\MATInit.c" type=".c" size="3666" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\pmm\MATInit\test.c" type=".c" size="1475" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="MATIntro" path="D:\4_Projects\mcertikos\kern\pmm\MATIntro" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\pmm\MATIntro\export.h" type=".h" size="440" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\pmm\MATIntro\Makefile.inc" type=".inc" size="501" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MATIntro.c" path="D:\4_Projects\mcertikos\kern\pmm\MATIntro\MATIntro.c" type=".c" size="2322" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\pmm\MATIntro\test.c" type=".c" size="2484" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="MATOp" path="D:\4_Projects\mcertikos\kern\pmm\MATOp" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\pmm\MATOp\export.h" type=".h" size="187" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\pmm\MATOp\import.h" type=".h" size="668" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\pmm\MATOp\Makefile.inc" type=".inc" size="471" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MATOp.c" path="D:\4_Projects\mcertikos\kern\pmm\MATOp\MATOp.c" type=".c" size="1954" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\pmm\MATOp\test.c" type=".c" size="1480" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="MContainer" path="D:\4_Projects\mcertikos\kern\pmm\MContainer" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\pmm\MContainer\export.h" type=".h" size="593" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\pmm\MContainer\import.h" type=".h" size="331" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\pmm\MContainer\Makefile.inc" type=".inc" size="521" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MContainer.c" path="D:\4_Projects\mcertikos\kern\pmm\MContainer\MContainer.c" type=".c" size="3702" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\pmm\MContainer\test.c" type=".c" size="1961" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+      </folder>
+      <folder name="proc" path="D:\4_Projects\mcertikos\kern\proc" fileCount="2" totalFileCount="8">
+        <files>
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\proc\Makefile.inc" type=".inc" size="115" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="proc.c" path="D:\4_Projects\mcertikos\kern\proc\proc.c" type=".c" size="285" created="2025-04-11T19:25:23Z" modified="2025-04-11T19:25:28Z" accessed="2025-04-11T19:25:28Z" />
+        </files>
+        <folder name="PProc" path="D:\4_Projects\mcertikos\kern\proc\PProc" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\proc\PProc\export.h" type=".h" size="228" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\proc\PProc\import.h" type=".h" size="269" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\proc\PProc\Makefile.inc" type=".inc" size="416" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PProc.c" path="D:\4_Projects\mcertikos\kern\proc\PProc\PProc.c" type=".c" size="943" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="PUCtxIntro" path="D:\4_Projects\mcertikos\kern\proc\PUCtxIntro" fileCount="2" totalFileCount="2">
+          <files>
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\proc\PUCtxIntro\Makefile.inc" type=".inc" size="461" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PUCtxIntro.c" path="D:\4_Projects\mcertikos\kern\proc\PUCtxIntro\PUCtxIntro.c" type=".c" size="69" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:52Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+      </folder>
+      <folder name="thread" path="D:\4_Projects\mcertikos\kern\thread" fileCount="1" totalFileCount="34">
+        <files>
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\thread\Makefile.inc" type=".inc" size="433" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+        <folder name="PCurID" path="D:\4_Projects\mcertikos\kern\thread\PCurID" fileCount="3" totalFileCount="3">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\thread\PCurID\export.h" type=".h" size="203" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\thread\PCurID\Makefile.inc" type=".inc" size="441" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PCurID.c" path="D:\4_Projects\mcertikos\kern\thread\PCurID\PCurID.c" type=".c" size="224" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="PKCtxIntro" path="D:\4_Projects\mcertikos\kern\thread\PKCtxIntro" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="cswitch.S" path="D:\4_Projects\mcertikos\kern\thread\PKCtxIntro\cswitch.S" type=".s" size="593" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\thread\PKCtxIntro\export.h" type=".h" size="308" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\thread\PKCtxIntro\Makefile.inc" type=".inc" size="534" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PKCtxIntro.c" path="D:\4_Projects\mcertikos\kern\thread\PKCtxIntro\PKCtxIntro.c" type=".c" size="922" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="PKCtxNew" path="D:\4_Projects\mcertikos\kern\thread\PKCtxNew" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\thread\PKCtxNew\export.h" type=".h" size="217" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\thread\PKCtxNew\import.h" type=".h" size="306" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\thread\PKCtxNew\Makefile.inc" type=".inc" size="528" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PKCtxNew.c" path="D:\4_Projects\mcertikos\kern\thread\PKCtxNew\PKCtxNew.c" type=".c" size="717" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\thread\PKCtxNew\test.c" type=".c" size="1482" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="PTCBInit" path="D:\4_Projects\mcertikos\kern\thread\PTCBInit" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\thread\PTCBInit\export.h" type=".h" size="173" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\thread\PTCBInit\import.h" type=".h" size="210" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\thread\PTCBInit\Makefile.inc" type=".inc" size="528" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PTCBInit.c" path="D:\4_Projects\mcertikos\kern\thread\PTCBInit\PTCBInit.c" type=".c" size="352" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\thread\PTCBInit\test.c" type=".c" size="1287" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="PTCBIntro" path="D:\4_Projects\mcertikos\kern\thread\PTCBIntro" fileCount="3" totalFileCount="3">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\thread\PTCBIntro\export.h" type=".h" size="937" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\thread\PTCBIntro\Makefile.inc" type=".inc" size="468" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PTCBIntro.c" path="D:\4_Projects\mcertikos\kern\thread\PTCBIntro\PTCBIntro.c" type=".c" size="2255" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:27:24Z" accessed="2025-04-11T19:27:24Z" />
+          </files>
+        </folder>
+        <folder name="PThread" path="D:\4_Projects\mcertikos\kern\thread\PThread" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\thread\PThread\export.h" type=".h" size="423" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\thread\PThread\import.h" type=".h" size="636" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\thread\PThread\Makefile.inc" type=".inc" size="518" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PThread.c" path="D:\4_Projects\mcertikos\kern\thread\PThread\PThread.c" type=".c" size="3834" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\thread\PThread\test.c" type=".c" size="1385" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="PTQueueInit" path="D:\4_Projects\mcertikos\kern\thread\PTQueueInit" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\thread\PTQueueInit\export.h" type=".h" size="357" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\thread\PTQueueInit\import.h" type=".h" size="646" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\thread\PTQueueInit\Makefile.inc" type=".inc" size="558" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PTQueueInit.c" path="D:\4_Projects\mcertikos\kern\thread\PTQueueInit\PTQueueInit.c" type=".c" size="2351" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\thread\PTQueueInit\test.c" type=".c" size="2381" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="PTQueueIntro" path="D:\4_Projects\mcertikos\kern\thread\PTQueueIntro" fileCount="3" totalFileCount="3">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\thread\PTQueueIntro\export.h" type=".h" size="438" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\thread\PTQueueIntro\Makefile.inc" type=".inc" size="495" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="PTQueueIntro.c" path="D:\4_Projects\mcertikos\kern\thread\PTQueueIntro\PTQueueIntro.c" type=".c" size="1674" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+      </folder>
+      <folder name="trap" path="D:\4_Projects\mcertikos\kern\trap" fileCount="1" totalFileCount="21">
+        <files>
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\trap\Makefile.inc" type=".inc" size="272" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:53Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+        <folder name="TDispatch" path="D:\4_Projects\mcertikos\kern\trap\TDispatch" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\trap\TDispatch\export.h" type=".h" size="193" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\trap\TDispatch\import.h" type=".h" size="314" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\trap\TDispatch\Makefile.inc" type=".inc" size="452" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="TDispatch.c" path="D:\4_Projects\mcertikos\kern\trap\TDispatch\TDispatch.c" type=".c" size="2356" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="TSyscall" path="D:\4_Projects\mcertikos\kern\trap\TSyscall" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\trap\TSyscall\export.h" type=".h" size="271" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\trap\TSyscall\import.h" type=".h" size="969" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\trap\TSyscall\Makefile.inc" type=".inc" size="443" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="TSyscall.c" path="D:\4_Projects\mcertikos\kern\trap\TSyscall\TSyscall.c" type=".c" size="11992" created="2016-01-10T04:38:58Z" modified="2025-04-11T19:34:18Z" accessed="2025-04-11T19:34:18Z" />
+          </files>
+        </folder>
+        <folder name="TSyscallArg" path="D:\4_Projects\mcertikos\kern\trap\TSyscallArg" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\trap\TSyscallArg\export.h" type=".h" size="733" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\trap\TSyscallArg\import.h" type=".h" size="176" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\trap\TSyscallArg\Makefile.inc" type=".inc" size="470" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="TSyscallArg.c" path="D:\4_Projects\mcertikos\kern\trap\TSyscallArg\TSyscallArg.c" type=".c" size="1254" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="TTrapHandler" path="D:\4_Projects\mcertikos\kern\trap\TTrapHandler" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\trap\TTrapHandler\export.h" type=".h" size="257" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\trap\TTrapHandler\import.h" type=".h" size="248" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\trap\TTrapHandler\Makefile.inc" type=".inc" size="479" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="TTrapHandler.c" path="D:\4_Projects\mcertikos\kern\trap\TTrapHandler\TTrapHandler.c" type=".c" size="5573" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:56:52Z" accessed="2025-04-11T18:56:52Z" />
+          </files>
+        </folder>
+        <folder name="TTrapInit" path="D:\4_Projects\mcertikos\kern\trap\TTrapInit" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\trap\TTrapInit\export.h" type=".h" size="201" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\trap\TTrapInit\import.h" type=".h" size="258" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\trap\TTrapInit\Makefile.inc" type=".inc" size="452" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="TTrapInit.c" path="D:\4_Projects\mcertikos\kern\trap\TTrapInit\TTrapInit.c" type=".c" size="3393" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+      </folder>
+      <folder name="vm" path="D:\4_Projects\mcertikos\kern\vm" fileCount="1" totalFileCount="1">
+        <files>
+          <file name="vmm.c" path="D:\4_Projects\mcertikos\kern\vm\vmm.c" type=".c" size="191" created="2025-04-11T19:25:05Z" modified="2025-04-11T19:25:09Z" accessed="2025-04-11T19:25:09Z" />
+        </files>
+      </folder>
+      <folder name="vmm" path="D:\4_Projects\mcertikos\kern\vmm" fileCount="1" totalFileCount="30">
+        <files>
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\vmm\Makefile.inc" type=".inc" size="298" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+        <folder name="MPTComm" path="D:\4_Projects\mcertikos\kern\vmm\MPTComm" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTComm\export.h" type=".h" size="268" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTComm\import.h" type=".h" size="607" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\vmm\MPTComm\Makefile.inc" type=".inc" size="491" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MPTComm.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTComm\MPTComm.c" type=".c" size="1761" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTComm\test.c" type=".c" size="1762" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="MPTInit" path="D:\4_Projects\mcertikos\kern\vmm\MPTInit" fileCount="4" totalFileCount="4">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTInit\export.h" type=".h" size="189" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTInit\import.h" type=".h" size="308" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\vmm\MPTInit\Makefile.inc" type=".inc" size="426" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MPTInit.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTInit\MPTInit.c" type=".c" size="429" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="MPTIntro" path="D:\4_Projects\mcertikos\kern\vmm\MPTIntro" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTIntro\export.h" type=".h" size="774" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTIntro\import.h" type=".h" size="182" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\vmm\MPTIntro\Makefile.inc" type=".inc" size="501" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MPTIntro.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTIntro\MPTIntro.c" type=".c" size="4088" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTIntro\test.c" type=".c" size="2029" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="MPTKern" path="D:\4_Projects\mcertikos\kern\vmm\MPTKern" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTKern\export.h" type=".h" size="308" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTKern\import.h" type=".h" size="536" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\vmm\MPTKern\Makefile.inc" type=".inc" size="491" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MPTKern.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTKern\MPTKern.c" type=".c" size="2021" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:54Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTKern\test.c" type=".c" size="1922" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="MPTNew" path="D:\4_Projects\mcertikos\kern\vmm\MPTNew" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTNew\export.h" type=".h" size="255" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTNew\import.h" type=".h" size="373" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\vmm\MPTNew\Makefile.inc" type=".inc" size="481" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MPTNew.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTNew\MPTNew.c" type=".c" size="1212" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTNew\test.c" type=".c" size="1454" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+        <folder name="MPTOp" path="D:\4_Projects\mcertikos\kern\vmm\MPTOp" fileCount="5" totalFileCount="5">
+          <files>
+            <file name="export.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTOp\export.h" type=".h" size="546" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="import.h" path="D:\4_Projects\mcertikos\kern\vmm\MPTOp\import.h" type=".h" size="715" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="Makefile.inc" path="D:\4_Projects\mcertikos\kern\vmm\MPTOp\Makefile.inc" type=".inc" size="471" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="MPTOp.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTOp\MPTOp.c" type=".c" size="2996" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            <file name="test.c" path="D:\4_Projects\mcertikos\kern\vmm\MPTOp\test.c" type=".c" size="1748" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+          </files>
+        </folder>
+      </folder>
+    </folder>
+    <folder name="misc" path="D:\4_Projects\mcertikos\misc" fileCount="9" totalFileCount="10">
+      <files>
+        <file name="bios.bin" path="D:\4_Projects\mcertikos\misc\bios.bin" type=".bin" size="131072" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T18:27:55Z" />
+        <file name="bootloader_install.sh" path="D:\4_Projects\mcertikos\misc\bootloader_install.sh" type=".sh" size="368" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="build_user_proc_table.py" path="D:\4_Projects\mcertikos\misc\build_user_proc_table.py" type=".py" size="1086" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="check_size.pl" path="D:\4_Projects\mcertikos\misc\check_size.pl" type=".pl" size="281" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="gccprefix.sh" path="D:\4_Projects\mcertikos\misc\gccprefix.sh" type=".sh" size="1074" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="mergedep.pl" path="D:\4_Projects\mcertikos\misc\mergedep.pl" type=".pl" size="2331" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="mount.sh" path="D:\4_Projects\mcertikos\misc\mount.sh" type=".sh" size="101" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="umount.sh" path="D:\4_Projects\mcertikos\misc\umount.sh" type=".sh" size="55" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="vgabios.bin" path="D:\4_Projects\mcertikos\misc\vgabios.bin" type=".bin" size="33280" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T18:27:55Z" />
+      </files>
+      <folder name="iso" path="D:\4_Projects\mcertikos\misc\iso" fileCount="0" totalFileCount="1">
+        <folder name="boot" path="D:\4_Projects\mcertikos\misc\iso\boot" fileCount="0" totalFileCount="1">
+          <folder name="grub" path="D:\4_Projects\mcertikos\misc\iso\boot\grub" fileCount="1" totalFileCount="1">
+            <files>
+              <file name="grub.cfg" path="D:\4_Projects\mcertikos\misc\iso\boot\grub\grub.cfg" type=".cfg" size="546" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+            </files>
+          </folder>
+        </folder>
+      </folder>
+    </folder>
+    <folder name="newfs" path="D:\4_Projects\mcertikos\newfs" fileCount="1" totalFileCount="1">
+      <files>
+        <file name="certikos_disk_new.img" path="D:\4_Projects\mcertikos\newfs\certikos_disk_new.img" type=".img" size="524288" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T18:27:55Z" />
+      </files>
+    </folder>
+    <folder name="samples" path="D:\4_Projects\mcertikos\samples" fileCount="9" totalFileCount="9">
+      <files>
+        <file name="MATInit.c" path="D:\4_Projects\mcertikos\samples\MATInit.c" type=".c" size="3643" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="MATIntro.c" path="D:\4_Projects\mcertikos\samples\MATIntro.c" type=".c" size="2102" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="MATOp.c" path="D:\4_Projects\mcertikos\samples\MATOp.c" type=".c" size="1886" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="MContainer.c" path="D:\4_Projects\mcertikos\samples\MContainer.c" type=".c" size="3935" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="MPTComm.c" path="D:\4_Projects\mcertikos\samples\MPTComm.c" type=".c" size="1793" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="MPTIntro.c" path="D:\4_Projects\mcertikos\samples\MPTIntro.c" type=".c" size="4009" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="MPTKern.c" path="D:\4_Projects\mcertikos\samples\MPTKern.c" type=".c" size="2082" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="MPTNew.c" path="D:\4_Projects\mcertikos\samples\MPTNew.c" type=".c" size="1185" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:55Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="MPTOp.c" path="D:\4_Projects\mcertikos\samples\MPTOp.c" type=".c" size="3114" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+      </files>
+    </folder>
+    <folder name="scripts" path="D:\4_Projects\mcertikos\scripts" fileCount="1" totalFileCount="1">
+      <files>
+        <file name="set_auto_load.sh" path="D:\4_Projects\mcertikos\scripts\set_auto_load.sh" type=".sh" size="154" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+      </files>
+    </folder>
+    <folder name="user" path="D:\4_Projects\mcertikos\user" fileCount="3" totalFileCount="34">
+      <files>
+        <file name="config.mk" path="D:\4_Projects\mcertikos\user\config.mk" type=".mk" size="4405" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+        <file name="Makefile.inc" path="D:\4_Projects\mcertikos\user\Makefile.inc" type=".inc" size="1002" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:42:27Z" accessed="2025-04-11T18:42:27Z" />
+        <file name="signal_test.c" path="D:\4_Projects\mcertikos\user\signal_test.c" type=".c" size="1022" created="2025-04-11T18:42:07Z" modified="2025-04-11T18:57:34Z" accessed="2025-04-11T18:57:34Z" />
+      </files>
+      <folder name="fstest" path="D:\4_Projects\mcertikos\user\fstest" fileCount="2" totalFileCount="2">
+        <files>
+          <file name="fstest.c" path="D:\4_Projects\mcertikos\user\fstest\fstest.c" type=".c" size="14307" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\user\fstest\Makefile.inc" type=".inc" size="823" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+      <folder name="idle" path="D:\4_Projects\mcertikos\user\idle" fileCount="2" totalFileCount="2">
+        <files>
+          <file name="idle.c" path="D:\4_Projects\mcertikos\user\idle\idle.c" type=".c" size="697" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\user\idle\Makefile.inc" type=".inc" size="776" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+      <folder name="include" path="D:\4_Projects\mcertikos\user\include" fileCount="12" totalFileCount="12">
+        <files>
+          <file name="debug.h" path="D:\4_Projects\mcertikos\user\include\debug.h" type=".h" size="576" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="file.h" path="D:\4_Projects\mcertikos\user\include\file.h" type=".h" size="1522" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="gcc.h" path="D:\4_Projects\mcertikos\user\include\gcc.h" type=".h" size="480" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="proc.h" path="D:\4_Projects\mcertikos\user\include\proc.h" type=".h" size="203" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="spinlock.h" path="D:\4_Projects\mcertikos\user\include\spinlock.h" type=".h" size="290" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="stdarg.h" path="D:\4_Projects\mcertikos\user\include\stdarg.h" type=".h" size="466" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="stdio.h" path="D:\4_Projects\mcertikos\user\include\stdio.h" type=".h" size="444" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="stdlib.h" path="D:\4_Projects\mcertikos\user\include\stdlib.h" type=".h" size="111" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="string.h" path="D:\4_Projects\mcertikos\user\include\string.h" type=".h" size="870" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="syscall.h" path="D:\4_Projects\mcertikos\user\include\syscall.h" type=".h" size="7640" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="types.h" path="D:\4_Projects\mcertikos\user\include\types.h" type=".h" size="1395" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="x86.h" path="D:\4_Projects\mcertikos\user\include\x86.h" type=".h" size="10253" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+      <folder name="lib" path="D:\4_Projects\mcertikos\user\lib" fileCount="9" totalFileCount="9">
+        <files>
+          <file name="atoi.c" path="D:\4_Projects\mcertikos\user\lib\atoi.c" type=".c" size="481" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="debug.c" path="D:\4_Projects\mcertikos\user\lib\debug.c" type=".c" size="583" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="entry.S" path="D:\4_Projects\mcertikos\user\lib\entry.S" type=".s" size="450" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\user\lib\Makefile.inc" type=".inc" size="857" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="printf.c" path="D:\4_Projects\mcertikos\user\lib\printf.c" type=".c" size="1267" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="printfmt.c" path="D:\4_Projects\mcertikos\user\lib\printfmt.c" type=".c" size="5818" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="proc.c" path="D:\4_Projects\mcertikos\user\lib\proc.c" type=".c" size="260" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="spinlock.c" path="D:\4_Projects\mcertikos\user\lib\spinlock.c" type=".c" size="636" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="string.c" path="D:\4_Projects\mcertikos\user\lib\string.c" type=".c" size="3985" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+      <folder name="pingpong" path="D:\4_Projects\mcertikos\user\pingpong" fileCount="4" totalFileCount="4">
+        <files>
+          <file name="ding.c" path="D:\4_Projects\mcertikos\user\pingpong\ding.c" type=".c" size="164" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\user\pingpong\Makefile.inc" type=".inc" size="1805" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="ping.c" path="D:\4_Projects\mcertikos\user\pingpong\ping.c" type=".c" size="524" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="pong.c" path="D:\4_Projects\mcertikos\user\pingpong\pong.c" type=".c" size="503" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+        </files>
+      </folder>
+      <folder name="shell" path="D:\4_Projects\mcertikos\user\shell" fileCount="2" totalFileCount="2">
+        <files>
+          <file name="Makefile.inc" path="D:\4_Projects\mcertikos\user\shell\Makefile.inc" type=".inc" size="800" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:27:56Z" accessed="2025-04-11T19:28:35Z" />
+          <file name="shell.c" path="D:\4_Projects\mcertikos\user\shell\shell.c" type=".c" size="17483" created="2016-01-10T04:38:58Z" modified="2025-04-11T18:57:24Z" accessed="2025-04-11T18:57:24Z" />
+        </files>
+      </folder>
+    </folder>
+  </folder>
+</contexto>
