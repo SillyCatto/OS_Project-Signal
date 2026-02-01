@@ -69,40 +69,43 @@ flowchart TB
     style E fill:#ff6b6b
 ```
 
-### Implementation Requirement
+### Implementation (Verified Working)
 
-The kernel should reject attempts to install handlers for SIGKILL:
+> **Note**: SIGKILL is now fully implemented. See [10_implementation_debug_log.md](10_implementation_debug_log.md) for details.
+
+SIGKILL is handled **immediately** in `sys_kill()`, not waiting for signal delivery:
 
 ```c
-void sys_sigaction(tf_t *tf) {
-    int signum = syscall_get_arg2(tf);
+void sys_kill(tf_t *tf) {
+    int pid = syscall_get_arg2(tf);
+    int signum = syscall_get_arg3(tf);
 
-    // SIGKILL cannot have a custom handler
-    if (signum == SIGKILL || signum == SIGSTOP) {
-        syscall_set_errno(tf, E_INVAL_SIGNUM);
+    // Validate...
+
+    // SIGKILL: terminate immediately, don't wait for delivery
+    if (signum == SIGKILL) {
+        tcb_set_state(pid, TSTATE_DEAD);
+        tqueue_remove(NUM_IDS, pid);
+        tcb_set_pending_signals(pid, 0);
+        syscall_set_errno(tf, E_SUCC);
         return;
     }
 
-    // ... rest of implementation
+    // Other signals: set pending
+    tcb_add_pending_signal(pid, signum);
+    // ...
 }
 ```
 
-### SIGKILL Delivery
+**Key insight**: We terminate in `sys_kill()` rather than `deliver_signal()` because blocked processes never run to check their pending signals!
 
-When delivering SIGKILL, skip the handler mechanism entirely:
+Also handled in `handle_pending_signals()` for the case where current process sends SIGKILL to itself:
 
 ```c
-void deliver_signal(tf_t *tf, int signum) {
-    // SIGKILL: immediate termination, no handler
-    if (signum == SIGKILL) {
-        // Terminate the process
-        proc_terminate(get_curid());
-        // Never returns
-        return;
-    }
-
-    // Normal signal delivery for other signals
-    // ...
+if (signum == SIGKILL) {
+    terminate_process(cur_pid);
+    thread_exit();  // Use thread_exit, NOT thread_yield!
+    return;
 }
 ```
 

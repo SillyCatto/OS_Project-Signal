@@ -282,47 +282,57 @@ sequenceDiagram
 
     Note over K,H: Signal is pending, trap_return() called
     K->>TF: tf->eip = handler_addr
-    K->>TF: tf->regs.eax = signum
+    K->>TF: Push trampoline + signum on stack
     K->>U: iret (return to user space)
 
     Note over K,H: Now executing in handler
-    U->>H: EIP at handler, EAX = signum
+    U->>H: EIP at handler, signum at [ESP+4]
     H->>H: Function prologue (push ebp, etc.)
     H->>H: Access signum argument
     H->>H: Execute handler body
     H->>H: Function epilogue
-    H->>U: ret instruction
+    H->>U: ret instruction (returns to trampoline)
 
-    Note over K,H: Handler returns (simplified - no trampoline)
+    Note over K,H: Trampoline executes sigreturn syscall
+    U->>K: int 0x30 (SYS_sigreturn)
+    K->>TF: Restore saved EIP/ESP
+    K->>U: iret (return to original location)
 ```
+
+> **Note**: Trampoline and sigreturn are now fully implemented. See [10_implementation_debug_log.md](10_implementation_debug_log.md) for details.
 
 ### Handler Stack Frame
 
-When the handler executes, it has a normal function call stack frame:
+When the handler executes, it has a proper function call stack frame with trampoline return:
 
 ```
 User Stack (during handler execution):
 +---------------------------+ High Address
 |   (previous stack data)   |
 +---------------------------+
-|   Return Address (???)    | ← Problem in simplified impl
+|   Saved EIP (for restore) | ← Original return point
 +---------------------------+
-|   Saved EBP               | ← Handler's stack frame
+|   Saved ESP (for restore) | ← Original stack pointer
 +---------------------------+
-|   Local variables         |
+|   Signal number           | ← Handler's first argument [ESP+4]
++---------------------------+
+|   Trampoline code         | ← Return address points here
+|   mov eax, SYS_sigreturn  |
+|   int 0x30                |
+|   jmp $                   |
 +---------------------------+ Low Address (ESP)
 ```
 
 ### Accessing the Signal Number
 
-The signal number is passed in EAX before the handler starts:
+The signal number is passed on the stack per cdecl calling convention:
 
 ```c
 // Handler receives signum as parameter
 void my_handler(int signum) {
-    // In assembly, this would be:
-    // mov eax, [ebp+8]  ; Get first argument
-    // But EAX already contains signum!
+    // In cdecl, arguments are on stack:
+    // [ESP]   = return address (trampoline)
+    // [ESP+4] = first argument (signum)
 
     if (signum == SIGINT) {
         printf("Got interrupt!\n");
@@ -330,7 +340,7 @@ void my_handler(int signum) {
 }
 ```
 
-**Note**: This is a simplified approach. In a full POSIX implementation, the signal number would be pushed onto the stack as a proper function argument.
+> **Implementation Note**: The signal number is pushed on the stack ABOVE the return address, following the cdecl calling convention. See the [implementation debug log](10_implementation_debug_log.md) for how this was verified.
 
 ---
 
@@ -529,22 +539,24 @@ flowchart TB
 
     subgraph Deliver["Delivery Phase"]
         D1[Clear pending bit]
-        D2[Set tf->eip = handler]
-        D3[Set tf->eax = signum]
-        D4[iret to user space]
+        D2[Setup trampoline on stack]
+        D3[Push signum + ret addr]
+        D4[Set tf->eip = handler]
+        D5[iret to user space]
     end
 
     subgraph Execute["Execution Phase"]
         E1[Handler function runs]
         E2[Handler does its work]
-        E3[Handler returns]
+        E3[Handler returns to trampoline]
+        E4[Trampoline calls sigreturn]
     end
 
     A1 --> A2 --> A3 --> A4
     A4 --> B1 --> B2
     B2 --> C1 --> C2 --> C3 --> C4
-    C4 --> D1 --> D2 --> D3 --> D4
-    D4 --> E1 --> E2 --> E3
+    C4 --> D1 --> D2 --> D3 --> D4 --> D5
+    D5 --> E1 --> E2 --> E3 --> E4
 ```
 
 ---

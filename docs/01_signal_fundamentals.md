@@ -216,18 +216,20 @@ sequenceDiagram
     alt Signal is pending and not blocked
         Note over Sender,Handler: Phase 4: Signal Delivery
         Kernel->>Kernel: Clear pending bit
-        Kernel->>Kernel: Save current EIP
+        Kernel->>Kernel: Save EIP/ESP to user stack
+        Kernel->>Kernel: Write trampoline code
         Kernel->>Kernel: Set EIP = handler address
-        Kernel->>Kernel: Set EAX = signal number
         Kernel->>Target: Return to user space (at handler)
 
         Note over Sender,Handler: Phase 5: Handler Execution
         Target->>Handler: Execute signal handler
+        Handler->>Handler: Read signum from [ESP+4]
         Handler->>Handler: Process signal
-        Handler->>Target: Return from handler
+        Handler->>Target: Return to trampoline
 
-        Note over Sender,Handler: Phase 6: Resume Execution
-        Target->>Target: Continue at original location
+        Note over Sender,Handler: Phase 6: Sigreturn
+        Target->>Kernel: Trampoline calls sigreturn
+        Kernel->>Target: Restore original context
     else Signal is blocked
         Kernel->>Target: Return normally
     end

@@ -171,8 +171,15 @@ struct sig_state {
     struct sigaction sigactions[NSIG];  // 32 slots for signal handlers
     uint32_t pending_signals;           // Bitmask: bit N = signal N pending
     int signal_block_mask;              // Bitmask: bit N = signal N blocked
+
+    // Context saved during signal delivery (for sigreturn)
+    uint32_t saved_esp_addr;            // Original ESP before handler
+    uint32_t saved_eip_addr;            // Original EIP (return point)
+    int in_signal_handler;              // Non-zero if currently handling
 };
 ```
+
+> **Implementation Note**: The `saved_esp_addr`, `saved_eip_addr`, and `in_signal_handler` fields were added to support the sigreturn mechanism. See [10_implementation_debug_log.md](10_implementation_debug_log.md) for details.
 
 ```mermaid
 classDiagram
@@ -180,6 +187,9 @@ classDiagram
         +sigaction[32] sigactions
         +uint32_t pending_signals
         +int signal_block_mask
+        +uint32_t saved_esp_addr
+        +uint32_t saved_eip_addr
+        +int in_signal_handler
     }
 
     class sigaction {
@@ -384,19 +394,21 @@ flowchart TB
     subgraph Before["Before Signal Delivery"]
         direction TB
         B_EIP["EIP → next_instruction (in user code)"]
-        B_EAX["EAX → (some value)"]
+        B_ESP["ESP → user stack pointer"]
         B_STACK["User Stack → normal execution state"]
     end
 
     subgraph After["After Signal Delivery"]
         direction TB
         A_EIP["EIP → signal_handler address"]
-        A_EAX["EAX → signal number (argument)"]
-        A_STACK["User Stack → unchanged"]
+        A_ESP["ESP → adjusted (lower)"]
+        A_STACK["User Stack contains:<br/>[ESP] = trampoline addr<br/>[ESP+4] = signum<br/>[ESP+8] = trampoline code"]
     end
 
     Before -->|"deliver_signal()"| After
 ```
+
+> **Note**: The signal number is passed on the stack as the handler's first argument (cdecl convention), not in EAX.
 
 ### Address Space Layout
 

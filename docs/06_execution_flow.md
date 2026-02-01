@@ -44,30 +44,33 @@ flowchart TB
 
     subgraph Phase5["Phase 5: Context Hijack"]
         H1[Clear pending bit]
-        H2[Modify tf->eip to handler]
-        H3[Set tf->eax to signum]
-        H4[Restore registers + iret]
+        H2[Save ESP/EIP to user stack]
+        H3[Write trampoline code]
+        H4[Push signum + return addr]
+        H5[Modify tf->eip to handler]
+        H6[Restore registers + iret]
     end
 
     subgraph Phase6["Phase 6: Handler Execution"]
         E1[CPU now at handler address]
         E2[Handler receives signal number]
         E3[Handler processes signal]
-        E4[Handler returns]
+        E4[Handler returns to trampoline]
     end
 
-    subgraph Phase7["Phase 7: Resume"]
-        F1[Return from handler]
-        F2[Continue normal execution]
+    subgraph Phase7["Phase 7: Sigreturn"]
+        F1[Trampoline calls sigreturn]
+        F2[Kernel restores ESP/EIP]
+        F3[Resume original execution]
     end
 
     R1 --> R2 --> R3 --> R4
     R4 --> N1 --> N2 --> N3
     N3 --> S1 --> S2 --> S3 --> S4
     S4 --> D1 --> D2 --> D3 --> D4
-    D4 --> H1 --> H2 --> H3 --> H4
-    H4 --> E1 --> E2 --> E3 --> E4
-    E4 --> F1 --> F2
+    D4 --> H1 --> H2 --> H3 --> H4 --> H5 --> H6
+    H6 --> E1 --> E2 --> E3 --> E4
+    E4 --> F1 --> F2 --> F3
 ```
 
 ---
@@ -124,12 +127,18 @@ T4      Return to user                  User code           Handler registered
 T10     Process running normally        User code           EIP = 0x40001XXX
 T11     [Another process] kill(pid, 2)  Kernel              pending_signals |= 0x04
 T12     Target process: timer interrupt Kernel entry        trap(tf)
-T13     trap_return(tf)                 Kernel              Check pending
-T14     deliver_signal(tf, 2)           Kernel              tf->eip = 0x40005678
-T15     iret                            CPU                 EIP ← 0x40005678
-T16     Handler executes                User code           "Received signal 2"
-T17     Handler ret                     User code           Return (simplified)
+T13     handle_pending_signals(tf)      Kernel              Check pending (before PT switch!)
+T14     deliver_signal(tf, 2)           Kernel              Setup stack + trampoline
+T15     tf->eip = handler               Kernel              tf->eip = 0x40005678
+T16     iret                            CPU                 EIP ← 0x40005678
+T17     Handler executes                User code           "Received signal 2"
+T18     Handler ret                     User code           Return to trampoline
+T19     Trampoline executes             User code           int 0x30 (sigreturn)
+T20     sys_sigreturn()                 Kernel              Restore tf->esp, tf->eip
+T21     iret                            CPU                 Resume original location
 ```
+
+> **Note**: The full sigreturn mechanism is now implemented. See [10_implementation_debug_log.md](10_implementation_debug_log.md) for details.
 
 ---
 
@@ -252,8 +261,7 @@ KERNEL SPACE (TCB updated):
 CPU REGISTERS:
 ┌──────────────────────────────────────────────────┐
 │ EIP:    0x40005678   (handler code)              │
-│ ESP:    0x7FFFFFD0   (user stack)                │
-│ EAX:    0x00000002   (signal number = SIGINT)    │
+│ ESP:    0x7FFFFFBC   (adjusted user stack)       │
 │ CS:     0x1B         (user code, CPL=3)          │
 │ SS:     0x23         (user stack segment)        │
 │ EFLAGS: 0x00000202   (IF set, interrupts on)     │
@@ -266,9 +274,11 @@ which is the signal_handler function!
 0x40005678:  push ebp        ; Handler prologue
 0x40005679:  mov ebp, esp
 0x4000567B:  sub esp, 0x10   ; Local variables
-0x4000567E:  mov eax, [ebp+8] ; Get argument (or use EAX directly)
-             ...
+0x4000567E:  mov eax, [ebp+8] ; Get argument from stack (signum)
+             ...              ; [ebp+8] = [ESP+4 before prologue] = 2
 ```
+
+> **Note**: The signal number is passed on the stack at `[ESP+4]`, not in EAX. This follows the cdecl calling convention.
 
 ---
 
@@ -490,18 +500,21 @@ flowchart TB
     style A3 fill:#69db7c
 ```
 
-### Summary Table
+### Summary Table (Updated)
 
 | Step | Location | Action | Key Change |
 |------|----------|--------|------------|
 | 1 | User | `sigaction()` | Handler stored in TCB |
 | 2 | Sender | `kill()` | `pending_signals` bit set |
 | 3 | Target | Any trap | Enters kernel |
-| 4 | Kernel | `trap_return()` | Checks pending signals |
-| 5 | Kernel | `deliver_signal()` | Modifies `tf->eip` |
+| 4 | Kernel | `handle_pending_signals()` | Checks pending (before PT switch!) |
+| 5 | Kernel | `deliver_signal()` | Setup stack, trampoline, modify `tf->eip` |
 | 6 | Kernel | `iret` | Returns to **handler** |
 | 7 | User | Handler | Executes custom code |
-| 8 | User | Return | Resumes (simplified) |
+| 8 | User | `ret` | Returns to trampoline |
+| 9 | User | Trampoline | Executes `int 0x30` (sigreturn) |
+| 10 | Kernel | `sys_sigreturn()` | Restores original `tf->esp`, `tf->eip` |
+| 11 | Kernel | `iret` | Resumes at original location |
 
 ---
 

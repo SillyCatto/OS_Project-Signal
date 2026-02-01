@@ -8,55 +8,50 @@
 
 ---
 
-## Current Implementation Limitations
+## Implementation Status (Updated)
 
-The mCertikOS signal implementation is simplified for educational purposes. Here are the key limitations:
+> **Note**: This section was updated after completing the signal implementation and debugging session. See [10_implementation_debug_log.md](10_implementation_debug_log.md) for the full debug chronicle.
 
-### 1. No Signal Trampoline / Restorer
+### ✅ Features Successfully Implemented
 
-**Problem**: After a signal handler returns, execution behavior is undefined.
+The following features are now **working**:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Signal handler registration | ✅ Working | `sigaction()` syscall |
+| Signal sending | ✅ Working | `kill()` syscall |
+| Signal trampoline | ✅ Working | Executable code on user stack |
+| Context save/restore | ✅ Working | `sigreturn()` syscall |
+| SIGKILL termination | ✅ Working | Immediate termination |
+| Handler argument passing | ✅ Working | Signal number passed correctly |
+| Process spawning | ✅ Working | `spawn` shell command |
+
+### How Trampoline Works (Implemented)
 
 ```mermaid
 flowchart TB
-    subgraph Current["Current (Simplified)"]
-        A1[Signal delivered]
-        A2[Handler executes]
-        A3[Handler returns]
-        A4[??? Undefined behavior]
-    end
-
-    subgraph POSIX["POSIX Compliant"]
+    subgraph Implemented["✅ Current Implementation"]
         B1[Signal delivered]
-        B2[Save context on user stack]
-        B3[Push trampoline address]
-        B4[Handler executes]
-        B5[Handler returns to trampoline]
-        B6[Trampoline calls sigreturn]
-        B7[Kernel restores context]
-        B8[Resume original code]
+        B2[Save ESP/EIP on user stack]
+        B3[Write trampoline code to stack]
+        B4[Push signum as argument]
+        B5[Push trampoline as return addr]
+        B6[Handler executes]
+        B7[Handler returns to trampoline]
+        B8[Trampoline: mov eax, SYS_sigreturn]
+        B9[Trampoline: int 0x30]
+        B10[Kernel restores context]
+        B11[Resume original code]
     end
+
+    B1 --> B2 --> B3 --> B4 --> B5 --> B6 --> B7 --> B8 --> B9 --> B10 --> B11
 ```
 
-**What's missing**: A signal trampoline that:
-1. Saves the original execution context to user stack
-2. Provides a return address for the handler
-3. Calls `sigreturn()` to restore context
+---
 
-**Impact**: Handlers cannot reliably return to the original execution point.
+## Remaining Limitations
 
-### 2. No Context Preservation
-
-**Problem**: Original registers are not saved before handler execution.
-
-```c
-// Current: Handler clobbers registers
-void handler(int signum) {
-    // Uses EAX, EBX, etc.
-    // Original values lost!
-}
-```
-
-**What's missing**: Saving and restoring the complete execution context.
+The following features are still **not implemented**:
 
 ### 3. No siginfo_t Support
 
@@ -148,17 +143,19 @@ kill -INT 0      # Send to all in current group
 
 ## Missing POSIX Features
 
-### Complete Feature Matrix
+### Complete Feature Matrix (Updated)
 
 | Feature | POSIX | mCertikOS | Priority |
 |---------|-------|-----------|----------|
 | Basic signals (1-31) | ✅ | ✅ | - |
-| `sigaction()` | ✅ | ⚠️ Partial | High |
+| `sigaction()` | ✅ | ✅ | - |
 | `kill()` | ✅ | ✅ | - |
-| `pause()` | ✅ | ⚠️ Basic | Medium |
+| `pause()` | ✅ | ✅ | - |
 | Signal handlers | ✅ | ✅ | - |
+| Signal trampoline | ✅ | ✅ | - |
+| `sigreturn()` | ✅ | ✅ | - |
+| SIGKILL termination | ✅ | ✅ | - |
 | Signal blocking | ✅ | ⚠️ Partial | Medium |
-| `sigreturn()` | ✅ | ❌ | High |
 | `sigprocmask()` | ✅ | ❌ | Medium |
 | `sigpending()` | ✅ | ❌ | Low |
 | `sigsuspend()` | ✅ | ❌ | Medium |
@@ -181,55 +178,22 @@ kill -INT 0      # Send to all in current group
 
 ### Extension 1: Proper Signal Return (sigreturn)
 
-**Implementation Plan**:
+---
 
-```c
-// 1. Define sigreturn syscall
-enum __syscall_nr {
-    // ...
-    SYS_sigreturn,
-};
+## Potential Extensions (Future Work)
 
-// 2. Modify deliver_signal to save context
-void deliver_signal(tf_t *tf, int signum) {
-    struct thread *t = tcb_get_entry(get_curid());
-    struct sigaction *sa = &t->sigstate.sigactions[signum];
+> **Note**: Extension 1 (sigreturn) has been **implemented**. See the working code in [10_implementation_debug_log.md](10_implementation_debug_log.md).
 
-    if (sa->sa_handler != NULL) {
-        // Save context on user stack
-        uintptr_t user_esp = tf->esp;
+### ✅ Extension 1: Proper Signal Return (IMPLEMENTED)
 
-        // Push original tf to user stack
-        user_esp -= sizeof(tf_t);
-        pt_copyout(tf, get_curid(), user_esp, sizeof(tf_t));
+This extension has been **completed**. The implementation includes:
 
-        // Push sigreturn trampoline address
-        user_esp -= 4;
-        uint32_t trampoline = TRAMPOLINE_ADDR;  // Known address
-        pt_copyout(&trampoline, get_curid(), user_esp, 4);
+1. **Trampoline code** written to user stack (executable machine code)
+2. **Context saving** (ESP/EIP saved to user stack)
+3. **sigreturn syscall** that restores the original context
+4. **cdecl calling convention** - signal number passed on stack, not in EAX
 
-        // Update stack pointer
-        tf->esp = user_esp;
-
-        // Set up handler call
-        tf->regs.eax = signum;
-        tf->eip = (uint32_t)sa->sa_handler;
-    }
-}
-
-// 3. Implement sigreturn syscall
-void sys_sigreturn(tf_t *tf) {
-    // Restore saved context from user stack
-    uintptr_t saved_tf_addr = tf->esp + 4;  // Skip return addr
-    tf_t saved_tf;
-    pt_copyin(get_curid(), saved_tf_addr, &saved_tf, sizeof(tf_t));
-
-    // Copy back to current trap frame
-    *tf = saved_tf;
-
-    // Return will use restored context
-}
-```
+See [09_implementation_plan.md](09_implementation_plan.md) Part 9 for the actual working code.
 
 ### Extension 2: Complete Signal Blocking
 

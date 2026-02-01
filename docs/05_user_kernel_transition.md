@@ -319,44 +319,64 @@ iret                  ; Return to user mode:
 
 ### The Critical Point
 
-Signal delivery happens at the transition point, in `trap_return()`, right before the IRET:
+Signal delivery happens at the transition point, in `handle_pending_signals()`, right before switching to user page table:
 
 ```mermaid
 sequenceDiagram
     participant TH as Trap Handler
-    participant TR as trap_return()
+    participant HPS as handle_pending_signals()
     participant DS as deliver_signal()
     participant TF as Trap Frame
     participant UM as User Mode
 
-    TH->>TR: trap_return(tf)
-    TR->>TR: Check pending_signals
+    TH->>HPS: handle_pending_signals(tf)
+    Note over HPS: Must run BEFORE set_pdir_base(cur_pid)!
+    HPS->>HPS: Check pending_signals
 
     alt Signals pending
-        TR->>DS: deliver_signal(tf, signum)
+        HPS->>DS: deliver_signal(tf, signum)
+        DS->>TF: Save context to user stack
+        DS->>TF: Write trampoline code
         DS->>TF: tf->eip = handler
-        DS->>TF: tf->regs.eax = signum
-        DS-->>TR: return
+        DS->>TF: tf->esp = adjusted
+        DS-->>HPS: return
     end
 
-    TR->>TR: popal (restore regs)
-    TR->>TR: pop es, ds
-    TR->>TR: skip trapno, err
-    TR->>UM: iret (to handler or original EIP)
+    HPS->>HPS: set_pdir_base(cur_pid)
+    HPS->>HPS: popal (restore regs)
+    HPS->>HPS: pop es, ds
+    HPS->>HPS: skip trapno, err
+    HPS->>UM: iret (to handler or original EIP)
 ```
 
 ### Modification of Trap Frame
 
+> **Note**: The actual implementation sets up a trampoline and passes signum on the stack. See [10_implementation_debug_log.md](10_implementation_debug_log.md) for complete code.
+
 ```c
 static void deliver_signal(tf_t *tf, int signum)
 {
-    struct thread *cur_thread = tcb_get_entry(get_curid());
-    struct sigaction *sa = &cur_thread->sigstate.sigactions[signum];
+    unsigned int cur_pid = get_curid();
+    struct sigaction *sa = get_sigaction(cur_pid, signum);
 
     if (sa->sa_handler != NULL) {
-        // The magic: modify where IRET will jump to
-        tf->regs.eax = signum;           // Pass signal number
-        tf->eip = (uint32_t)sa->sa_handler;  // Change destination
+        // Save context for sigreturn
+        uintptr_t user_esp = tf->esp;
+        user_esp -= 4; pt_copyout(&tf->eip, cur_pid, user_esp, 4);
+        user_esp -= 4; pt_copyout(&tf->esp, cur_pid, user_esp, 4);
+
+        // Write trampoline (mov eax, SYS_sigreturn; int 0x30; jmp $)
+        user_esp -= 9;
+        uint8_t trampoline[] = {0xB8,0x42,0,0,0, 0xCD,0x30, 0xEB,0xFE};
+        pt_copyout(trampoline, cur_pid, user_esp, 9);
+        uint32_t trampoline_addr = user_esp;
+
+        // Push signum (cdecl argument) and return address
+        user_esp -= 4; pt_copyout(&signum, cur_pid, user_esp, 4);
+        user_esp -= 4; pt_copyout(&trampoline_addr, cur_pid, user_esp, 4);
+
+        tf->esp = user_esp;
+        tf->eip = (uint32_t)sa->sa_handler;
     }
 }
 ```
@@ -373,18 +393,17 @@ BEFORE deliver_signal():                 AFTER deliver_signal():
 +------------------+                     +------------------+
 | EFLAGS           |                     | EFLAGS           |
 +------------------+                     +------------------+
-| ESP = 0x7FFFFD00 |                     | ESP = 0x7FFFFD00 |
+| ESP = 0x7FFFFD00 |                     | ESP = 0x7FFFFCE0 | ← ADJUSTED!
 +------------------+                     +------------------+
 | SS = 0x23        |                     | SS = 0x23        |
 +------------------+                     +------------------+
-|       ...        |                     |       ...        |
-+------------------+                     +------------------+
-| EAX = 42         | ← Some value        | EAX = 2          | ← SIGINT!
-+------------------+                     +------------------+
 
-When IRET executes:                      When IRET executes:
-→ Jump to 0x40001234                     → Jump to 0x40005678 (handler)
-→ EAX contains 42                        → EAX contains 2 (signal number)
+User stack now contains:
+  [ESP]   = trampoline_addr (return address)
+  [ESP+4] = 2 (signal number - handler's argument)
+  [ESP+8] = trampoline code (9 bytes)
+  [ESP+17] = saved ESP
+  [ESP+21] = saved EIP
 ```
 
 ---
@@ -421,8 +440,9 @@ sequenceDiagram
     TR->>TR: Found: SIGINT (bit 2 set)
     TR->>TR: Clear pending bit
     TR->>TR: deliver_signal(tf, 2)
+    TR->>TR: Setup trampoline on stack
     TR->>TR: tf->eip = handler_addr
-    TR->>TR: tf->regs.eax = 2
+    TR->>TR: tf->esp = adjusted
 
     Note over UP,H: 5. Return to user (at handler!)
     TR->>TR: popal, pop es, pop ds
@@ -431,6 +451,7 @@ sequenceDiagram
 
     Note over UP,H: 6. Handler executes
     H->>H: void handler(int signum) { ... }
+    H->>H: signum read from [ESP+4]
 ```
 
 ### Detailed State Trace
@@ -499,12 +520,18 @@ TCB.sigstate.pending_signals = 0x00000004 (bit 2 set)
 
 deliver_signal(tf, 2) modifies trap frame:
 - tf->eip changed: 0x40001005 → 0x40005678 (handler)
-- tf->regs.eax changed: 0 → 2 (SIGINT)
+- tf->esp changed: 0x7FFFFFD0 → 0x7FFFFFBC (stack adjusted for trampoline + args)
+
+User Stack now contains:
+  [ESP]   = trampoline address (return addr)
+  [ESP+4] = 2 (SIGINT - handler argument)
+  [ESP+8] = trampoline code
+  ...saved context...
 
 Kernel Stack (modified tf_t):
 +------------------+
 | SS = 0x23        |
-| ESP = 0x7FFFFFD0 |
+| ESP = 0x7FFFFFBC | ← CHANGED (stack adjusted)
 | EFLAGS = 0x202   |
 | CS = 0x1B        |
 | EIP = 0x40005678 | ← CHANGED to handler!
@@ -512,7 +539,6 @@ Kernel Stack (modified tf_t):
 | trapno = 48      |
 | DS = 0x23        |
 | ES = 0x23        |
-| EAX = 2          | ← CHANGED to signal number!
 | ...              |
 +------------------+
 
@@ -522,9 +548,10 @@ Kernel Stack (modified tf_t):
 
 CPU: Ring 3
 EIP: 0x40005678 (handler, NOT original location!)
-ESP: 0x7FFFFFD0 (user stack)
-EAX: 2 (signal number)
+ESP: 0x7FFFFFBC (adjusted user stack)
 CS:  0x1B (user code)
+
+Signal number (2) is on stack at [ESP+4]
 
 NOW EXECUTING SIGNAL HANDLER!
 ```

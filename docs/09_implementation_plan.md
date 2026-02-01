@@ -311,10 +311,12 @@ struct sigaction {
 | Field | Type | Size | Description |
 |-------|------|------|-------------|
 | `sa_handler` | `sighandler_t` | 4 bytes | Pointer to handler function, or SIG_DFL/SIG_IGN |
-| `sa_sigaction` | function pointer | 4 bytes | Extended handler (for SA_SIGINFO) - not implemented |
+| `sa_sigaction` | function pointer | 4 bytes | Extended handler (for SA_SIGINFO) - not used |
 | `sa_flags` | `int` | 4 bytes | Behavior flags (SA_RESTART, SA_NODEFER, etc.) |
-| `sa_restorer` | function pointer | 4 bytes | Signal trampoline function - not implemented |
+| `sa_restorer` | function pointer | 4 bytes | Signal trampoline - we use inline trampoline instead |
 | `sa_mask` | `uint32_t` | 4 bytes | Signals to block during handler execution |
+
+> **Note**: Instead of using `sa_restorer`, our implementation writes executable trampoline code directly to the user stack. See Part 9 for details.
 
 **Special Values for sa_handler**:
 ```c

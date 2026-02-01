@@ -103,14 +103,18 @@ flowchart LR
 | Test program | `user/signal_test.c` | Signal testing code |
 | Shell commands | `user/shell/shell.c` | kill, trap commands |
 
-### The Critical Insight: EIP Hijacking
+### The Critical Insight: EIP Hijacking + Stack Setup
 
-The kernel delivers signals by modifying the saved `EIP` (instruction pointer) in the trap frame:
+The kernel delivers signals by modifying the saved `EIP` (instruction pointer) and setting up a return trampoline:
 
 ```c
-// In deliver_signal()
+// In deliver_signal() - simplified
+// 1. Save context for sigreturn
+// 2. Write trampoline code to user stack
+// 3. Push signum and trampoline address
 tf->eip = (uint32_t)sa->sa_handler;  // Redirect execution!
-tf->regs.eax = signum;               // Pass signal number
+tf->esp = user_esp;                   // Adjusted stack pointer
+// Signal number passed on stack at [ESP+4], not in EAX
 ```
 
 When `IRET` executes, the CPU jumps to the handler instead of the original location.
@@ -138,16 +142,25 @@ The implementation focuses on four common signals:
 
 *Catching SIGSEGV is possible but not recommended
 
-## Current Limitations
+## Implementation Status
 
-The implementation is simplified for educational purposes:
+The following features have been **implemented and tested**:
 
-- ❌ No signal trampoline (handler return is undefined)
-- ❌ No context save/restore
-- ❌ No siginfo_t support
-- ⚠️ Incomplete signal blocking
-- ❌ No signal queuing
-- ❌ No alarm() syscall
+- ✅ Signal handler registration (`sigaction`)
+- ✅ Signal sending (`kill`)
+- ✅ Signal trampoline (handler can return properly)
+- ✅ Context save/restore (`sigreturn` syscall)
+- ✅ SIGKILL immediate termination
+- ✅ Process spawning and termination
+- ✅ Shell commands (`trap`, `kill`, `spawn`)
+
+**Remaining limitations** (not implemented):
+
+- ❌ No `siginfo_t` support (extended signal info)
+- ❌ No signal blocking during handler (`sa_mask`)
+- ❌ No signal queuing (multiple same signals collapsed)
+- ❌ No `alarm()` syscall
+- ❌ No process groups
 
 See [08_limitations_and_extensions.md](08_limitations_and_extensions.md) for details.
 

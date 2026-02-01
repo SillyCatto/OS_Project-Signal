@@ -237,18 +237,34 @@ The kernel checks for pending signals at **every** return to user space because:
 
 ### The deliver_signal Function
 
+> **Note**: This is a simplified view. The actual implementation saves context and sets up a trampoline for proper return handling. See [10_implementation_debug_log.md](10_implementation_debug_log.md) for the complete code.
+
 ```c
 static void deliver_signal(tf_t *tf, int signum)
 {
-    struct thread *cur_thread = tcb_get_entry(get_curid());
-    struct sigaction *sa = &cur_thread->sigstate.sigactions[signum];
+    unsigned int cur_pid = get_curid();
+    struct sigaction *sa = get_sigaction(cur_pid, signum);
 
-    if (sa->sa_handler != NULL) {
-        // Pass signal number as first argument (x86 calling convention)
-        tf->regs.eax = signum;
+    if (sa->sa_handler != NULL && sa->sa_handler != SIG_IGN) {
+        // Save original context for sigreturn
+        uintptr_t user_esp = tf->esp;
+        user_esp -= 4; pt_copyout(&tf->eip, cur_pid, user_esp, 4);  // saved EIP
+        user_esp -= 4; pt_copyout(&tf->esp, cur_pid, user_esp, 4);  // saved ESP
 
-        // THE KEY HIJACK: Change where execution will resume
-        tf->eip = (uint32_t)sa->sa_handler;
+        // Write trampoline code (mov eax, SYS_sigreturn; int 0x30; jmp $)
+        user_esp -= 8;
+        uint8_t trampoline[] = {0xB8, 0x42, 0, 0, 0, 0xCD, 0x30, 0xEB, 0xFE};
+        pt_copyout(trampoline, cur_pid, user_esp, sizeof(trampoline));
+        uint32_t trampoline_addr = user_esp;
+
+        // Push signal number (cdecl first argument)
+        user_esp -= 4; pt_copyout(&signum, cur_pid, user_esp, 4);
+
+        // Push trampoline as return address
+        user_esp -= 4; pt_copyout(&trampoline_addr, cur_pid, user_esp, 4);
+
+        tf->esp = user_esp;
+        tf->eip = (uint32_t)sa->sa_handler;  // THE KEY HIJACK
     }
 }
 ```
@@ -261,21 +277,22 @@ flowchart TB
         direction TB
         TF1["Trap Frame"]
         EIP1["tf->eip = 0x40001000<br/>(next user instruction)"]
-        EAX1["tf->regs.eax = 42<br/>(some previous value)"]
+        ESP1["tf->esp = 0x7FFFFFD0<br/>(user stack pointer)"]
     end
 
     subgraph During["deliver_signal() Execution"]
         direction TB
         ACT["sa = sigactions[SIGINT]<br/>sa->sa_handler = 0x40005678"]
+        MOD0["Save context to user stack"]
         MOD1["tf->eip = 0x40005678"]
-        MOD2["tf->regs.eax = 2 (SIGINT)"]
+        MOD2["tf->esp = 0x7FFFFFBC (adjusted)"]
     end
 
     subgraph After["After deliver_signal()"]
         direction TB
         TF2["Trap Frame (Modified)"]
         EIP2["tf->eip = 0x40005678<br/>(signal handler address)"]
-        EAX2["tf->regs.eax = 2<br/>(signal number)"]
+        ESP2["tf->esp = 0x7FFFFFBC<br/>(stack with trampoline + arg)"]
     end
 
     Before --> During --> After
@@ -315,12 +332,21 @@ User Code Memory:
 
 0x40005678:  signal_handler:      ; <-- NEW EIP points here!
 0x40005678:    push ebp           ; Handler will execute
-0x40005679:    mov ebp, esp       ; EAX = signal number (2)
+0x40005679:    mov ebp, esp       ;
 0x4000567B:    sub esp, 8
-0x4000567E:    mov [esp], eax     ; Use signal number
-0x40005681:    call printf
+0x4000567E:    mov eax, [ebp+8]   ; Get signum from stack
+0x40005681:    push eax           ; Push for printf
+0x40005682:    push fmt
+0x40005684:    call printf
              ...
-0x400056A0:    ret                ; Return... but where?
+0x400056A0:    ret                ; Returns to trampoline on stack
+
+User Stack (after deliver_signal):
+
+  [ESP]   = 0x7FFFFFC4    ; Return address (points to trampoline)
+  [ESP+4] = 2              ; Signal number (handler argument)
+  [ESP+8] = B8 42 00 00... ; Trampoline code
+```
 ```
 
 ---
@@ -341,21 +367,29 @@ void my_handler(int signum) {
 
 ### How the Argument is Passed
 
-In the x86 cdecl calling convention, the first argument is pushed on the stack. However, in this simplified implementation, the signal number is passed in **EAX**:
+In the x86 cdecl calling convention, the first argument is on the stack at `[ESP+4]` (after the return address at `[ESP]`):
 
 ```c
-tf->regs.eax = signum;  // Signal number as argument
+// Stack layout when handler starts:
+// [ESP]   = return address (trampoline)
+// [ESP+4] = signum (first argument)
+
+user_esp -= 4; pt_copyout(&signum, cur_pid, user_esp, 4);      // Push argument
+user_esp -= 4; pt_copyout(&trampoline_addr, cur_pid, user_esp, 4); // Push return addr
 ```
 
-### The Return Problem
+### Handler Return via Trampoline
 
-When the handler executes `ret`, where does execution go?
+When the handler executes `ret`, it returns to the trampoline code on the user stack:
 
-**Current Implementation Issue**: The simplified implementation doesn't properly set up a return address for the handler. A complete implementation would:
+```asm
+; Trampoline code (9 bytes)
+mov eax, SYS_sigreturn   ; 0xB8 0x42 0x00 0x00 0x00
+int 0x30                 ; 0xCD 0x30
+jmp $                    ; 0xEB 0xFE (infinite loop, never reached)
+```
 
-1. Save the original EIP on the user stack
-2. Push a return address pointing to a "signal trampoline"
-3. The trampoline calls `sigreturn()` to restore original context
+The `sigreturn` syscall then restores the saved ESP/EIP and resumes execution at the original location.
 
 ```mermaid
 flowchart TB
@@ -375,15 +409,23 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    subgraph Current["mCertikOS Simplified Implementation"]
-        A[Modify EIP to handler]
-        B[Set EAX to signal number]
-        C[Handler executes]
-        D[Handler returns - undefined behavior]
+    subgraph Current["mCertikOS Implementation (Updated)"]
+        A[Save ESP/EIP to user stack]
+        B[Write trampoline code to stack]
+        C[Push signum argument]
+        D[Push trampoline as return addr]
+        E[Modify EIP to handler]
+        F[Handler executes]
+        G[Handler returns to trampoline]
+        H[Trampoline calls sigreturn]
+        I[Kernel restores ESP/EIP]
+        J[Resume at original location]
     end
 
-    A --> B --> C --> D
+    A --> B --> C --> D --> E --> F --> G --> H --> I --> J
 ```
+
+> **Note**: The trampoline and sigreturn mechanism has been fully implemented. See [10_implementation_debug_log.md](10_implementation_debug_log.md) for implementation details.
 
 ---
 
@@ -417,23 +459,26 @@ sequenceDiagram
     Note over PA,H: Step 3: Process B enters kernel (any trap)
     PB->>K: Any syscall / interrupt / exception
     K->>K: Handle the trap...
-    K->>K: trap_return(tf)
+    K->>K: handle_pending_signals(tf)
     K->>TCB2: Check pending_signals
     K->>K: pending_signals & (1<<2) = 0x04 ✓
     K->>K: signal_block_mask & (1<<2) = 0x00 ✓
     K->>TCB2: pending_signals &= ~(1<<2)
     K->>K: deliver_signal(tf, 2)
+    K->>K: Setup trampoline on stack
     K->>K: tf->eip = handler_address
-    K->>K: tf->regs.eax = 2
 
     Note over PA,H: Step 4: Return to user space at handler
     K->>H: iret (to handler)
     H->>H: void handler(int signum)
-    H->>H: signum = 2 (from EAX)
+    H->>H: signum = 2 (from [ESP+4])
     H->>H: Execute handler code
 
-    Note over PA,H: Step 5: Handler returns
-    H->>PB: ret (ideally to trampoline)
+    Note over PA,H: Step 5: Handler returns to trampoline
+    H->>H: ret (to trampoline)
+    H->>K: int 0x30 (sigreturn)
+    K->>K: Restore saved ESP/EIP
+    K->>PB: iret (resume original)
 ```
 
 ### Detailed State Changes
@@ -462,13 +507,20 @@ TCB[2].pending_signals = 0x00000004
 
 === After deliver_signal() ===
 tf->eip = 0x40005678    // Handler address!
-tf->regs.eax = 2        // Signal number!
+tf->esp = <adjusted>    // Stack has trampoline + args
 TCB[2].pending_signals = 0x00000000  // Cleared
+
+User stack now contains:
+  [ESP]   = trampoline_addr  // Return address
+  [ESP+4] = 2                 // Signal number
+  [ESP+8] = trampoline code   // mov eax,66; int 0x30; jmp $
+  [ESP+17] = saved ESP
+  [ESP+21] = saved EIP
 
 
 === After iret ===
 CPU.EIP = 0x40005678    // Executing handler!
-CPU.EAX = 2             // Signal number available
+Handler reads signum from [ESP+4] = 2
 User is now in handler, not original code
 ```
 
