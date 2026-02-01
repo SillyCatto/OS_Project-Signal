@@ -202,7 +202,7 @@ flowchart TB
         end
 
         subgraph TCB["Thread Control Block"]
-            SIGSTATE[sig_state<br/>• sigactions[32]<br/>• pending_signals<br/>• saved_esp/eip]
+            SIGSTATE["sig_state<br/>• sigactions[32]<br/>• pending_signals<br/>• saved_esp/eip"]
         end
 
         subgraph TrapHandler["Trap Handler"]
@@ -490,12 +490,12 @@ flowchart TB
 │  state: TSTATE_RUN                                                  │
 │  ...                                                                │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                      sig_state                               │    │
+│  │                      sig_state                              │    │
 │  ├─────────────────────────────────────────────────────────────┤    │
-│  │  sigactions[32]     Array of signal handlers                 │    │
+│  │  sigactions[32]     Array of signal handlers                │    │
 │  │    [2].sa_handler = 0x400012d0  ← SIGINT handler            │    │
 │  │    [9].sa_handler = NULL        ← SIGKILL (can't catch)     │    │
-│  │                                                              │    │
+│  │                                                             │    │
 │  │  pending_signals    0x00000004  ← Bit 2 set (SIGINT)        │    │
 │  │  signal_block_mask  0x00000000  ← No signals blocked        │    │
 │  │  saved_esp_addr     0xeffffb10  ← For sigreturn             │    │
