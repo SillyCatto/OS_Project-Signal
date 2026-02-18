@@ -1,6 +1,8 @@
 #include <lib/pmap.h>
 #include <lib/string.h>
 #include <lib/types.h>
+#include <lib/debug.h>
+#include <lib/x86.h>
 
 #define PTE_P		0x001	/* Present */
 #define PTE_W		0x002	/* Writeable */
@@ -66,6 +68,8 @@ pt_copyout(void *kva, uint32_t pmap_id, uintptr_t uva, size_t len)
 		if ((uva_pa & PTE_P) == 0) {
 			alloc_page(pmap_id, uva, PTE_P | PTE_U | PTE_W);
 			uva_pa = get_ptbl_entry_by_va(pmap_id, uva);
+			// Invalidate TLB entry for this virtual address
+			invlpg(uva);
 		}
 
 		uva_pa = (uva_pa & 0xfffff000) + (uva % PAGESIZE);

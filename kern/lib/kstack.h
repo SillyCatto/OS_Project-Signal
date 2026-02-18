@@ -35,9 +35,9 @@ struct kstack {
 };
 
 
-/* bsp_kstack is defined in kern/init/init.c file */
-struct kstack bsp_kstack[NUM_CPUS];
-struct kstack proc_kstack[NUM_IDS];
+/* bsp_kstack and proc_kstack are defined in kern/init/init.c file */
+extern struct kstack bsp_kstack[NUM_CPUS];
+extern struct kstack proc_kstack[NUM_IDS];
 
 #endif /* _KERN_ */
 #endif /* !_KERN_LIB_KSTACK_H_ */

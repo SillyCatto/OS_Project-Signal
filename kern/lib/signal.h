@@ -5,6 +5,10 @@
 
 #define NSIG 32  // max number of signals
 
+// Standard signal numbers
+#define SIGKILL 9   // Kill signal (cannot be caught or ignored)
+#define SIGTERM 15  // Termination signal
+
 typedef void (*sighandler_t)(int);
 
 struct sigaction {
@@ -19,6 +23,10 @@ struct sig_state {
     struct sigaction sigactions[NSIG];
     uint32_t pending_signals;
     int signal_block_mask;
+    // Saved context for sigreturn
+    uint32_t saved_esp_addr;  // Address on user stack where ESP is saved
+    uint32_t saved_eip_addr;  // Address on user stack where EIP is saved
+    int in_signal_handler;    // Flag indicating if we're in a signal handler
 };
 
 // Signal numbers (POSIX standard signals)
@@ -53,4 +61,4 @@ struct sig_state {
 #define SA_NODEFER   0x40000000
 #define SA_RESETHAND 0x80000000
 
-#endif /* !__KERN_LIB_SIGNAL_H__ */ 
+#endif /* !__KERN_LIB_SIGNAL_H__ */

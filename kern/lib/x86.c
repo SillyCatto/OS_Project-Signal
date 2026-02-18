@@ -230,6 +230,12 @@ lcr3(uint32_t val)
 }
 
 gcc_inline void
+invlpg(uintptr_t addr)
+{
+	__asm __volatile("invlpg (%0)" : : "r" (addr) : "memory");
+}
+
+gcc_inline void
 lcr4(uint32_t val)
 {
 	__asm __volatile("movl %0,%%cr4" : : "r" (val));

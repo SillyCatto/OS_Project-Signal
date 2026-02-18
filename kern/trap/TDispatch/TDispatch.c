@@ -132,6 +132,21 @@ void syscall_dispatch(tf_t *tf)
   case SYS_stat:
     sys_fstat(tf);
     break;
+
+  /** Signal syscalls **/
+  case SYS_sigaction:
+    sys_sigaction(tf);
+    break;
+  case SYS_kill:
+    sys_kill(tf);
+    break;
+  case SYS_pause:
+    sys_pause(tf);
+    break;
+  case SYS_sigreturn:
+    sys_sigreturn(tf);
+    break;
+
   default:
     syscall_set_errno(E_INVAL_CALLNR);
   }

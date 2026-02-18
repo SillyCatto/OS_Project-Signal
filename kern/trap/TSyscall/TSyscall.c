@@ -3,10 +3,12 @@
 #include <lib/syscall.h>
 #include <lib/debug.h>
 #include <lib/x86.h>
+#include <lib/thread.h>
 #include <dev/intr.h>
 #include <pcpu/PCPUIntro/export.h>
 #include <vmm/MPTOp/export.h>
 #include <thread/PThread/export.h>
+#include <thread/PTQueueInit/export.h>
 #include <lib/signal.h>
 #include <thread/PTCBIntro/export.h>
 #include <thread/PCurID/export.h>
@@ -15,6 +17,7 @@
 #include <kern/fs/dir.h>
 #include <kern/fs/stat.h>
 #include <kern/fs/path.h>
+#include <kern/fs/params.h>
 #include <lib/ipc.h>
 #include <lib/monitor.h>
 
@@ -27,35 +30,35 @@ extern spinlock_t msg_lock;
 void sys_sync_send(tf_t *tf){
    unsigned int cur_pid;
    unsigned int recv_pid, user_addr, length;
-//   spinlock_acquire(&msg_lock); 
+//   spinlock_acquire(&msg_lock);
    recv_pid = syscall_get_arg2(tf);
    user_addr = syscall_get_arg3(tf);
    length = syscall_get_arg4(tf);
    cur_pid = get_curid();
-   msgBlock[cur_pid].recv_pid = recv_pid; 
+   msgBlock[cur_pid].recv_pid = recv_pid;
    msgBlock[cur_pid].buffer_addr = user_addr;
    msgBlock[cur_pid].length = length;
    msg_enqueue(cur_pid);
-   thread_wakeup(&msgBlock[cur_pid].send_cv); 
+   thread_wakeup(&msgBlock[cur_pid].send_cv);
    // cur_pid has not been read, block and wait for it
    while(msg_getBlockBySendID(cur_pid) != NUM_IDS){
       thread_sleep(&msgBlock[cur_pid].recv_cv, &msg_lock);
-   } 
+   }
    syscall_set_errno(tf, E_SUCC);
-//   spinlock_release(&msg_lock);  
+//   spinlock_release(&msg_lock);
    return ;
 }
 
 void sys_sync_recv(tf_t *tf){
    unsigned int cur_pid;
    unsigned int send_pid, user_recv_addr, recv_length, send_length, copy_length, user_send_addr;
-//   spinlock_acquire(&msg_lock); 
-   
+//   spinlock_acquire(&msg_lock);
+
    send_pid = syscall_get_arg2(tf);
    user_recv_addr = syscall_get_arg3(tf);
    recv_length = syscall_get_arg4(tf);
    cur_pid = get_curid();
-   
+
    // loop if current pid has no received message or received message is not sent from target process
    while(msg_getBlockBySendID(send_pid) == NUM_IDS || msgBlock[send_pid].recv_pid != cur_pid){
       thread_sleep(&msgBlock[send_pid].send_cv, &msg_lock);
@@ -64,7 +67,7 @@ void sys_sync_recv(tf_t *tf){
    user_send_addr = msgBlock[send_pid].buffer_addr;
    send_length = msgBlock[send_pid].length;
 
-   // find the min of send_length and recv_length, then copy data from source process addressing space to dest process addressing space 
+   // find the min of send_length and recv_length, then copy data from source process addressing space to dest process addressing space
    copy_length = send_length < recv_length? send_length: recv_length;
    ipc_copy(cur_pid, user_recv_addr, send_pid, user_send_addr, copy_length);
    msg_remove(send_pid);
@@ -72,7 +75,7 @@ void sys_sync_recv(tf_t *tf){
    syscall_set_errno(tf, E_SUCC);
    syscall_set_retval1(tf, copy_length);
 //   spinlock_release(&msg_lock);
-   return ; 
+   return ;
 }
 
 static char sys_buf[NUM_IDS][PAGESIZE];
@@ -220,7 +223,7 @@ void sys_is_dir(tf_t * tf){
     syscall_set_retval1(tf, -1);
     syscall_set_errno(tf, E_BADF);
     return ;
-  } 
+  }
   type = fp->ip->type;
   isDir = (type == T_DIR);
   syscall_set_errno(tf, E_SUCC);
@@ -258,23 +261,37 @@ void sys_ls(tf_t *tf)
   int cur_pid = get_curid();
   int len;
   char * buf_p = sys_buf[cur_pid];
-  struct inode* dp = (struct inode*)tcb_get_cwd(cur_pid);  
+  struct inode* dp = (struct inode*)tcb_get_cwd(cur_pid);
+
+  // Lazily initialize cwd to root if not set
+  if (dp == NULL) {
+    dp = inode_get(ROOTDEV, ROOTINO);
+    tcb_set_cwd(cur_pid, dp);
+  }
+
+  // Lock the inode to ensure it's valid
+  inode_lock(dp);
+
   de_size = sizeof(de);
   for(off = 0; off < dp->size; off += de_size){
     if(inode_read(dp, (char *)&de, off, de_size)!= de_size){
         // size is not legal
-        KERN_PANIC("wrong in dir_lookup"); 
+        inode_unlock(dp);
+        KERN_PANIC("wrong in dir_lookup");
     }
     if(de.inum == 0){
         // free entry
         continue;
     }
-    // TODO index may out of bound  
+    // TODO index may out of bound
     strncpy(buf_p, de.name, strnlen(de.name, PAGESIZE));
     buf_p += strnlen(de.name, PAGESIZE);
-    *(buf_p++) = ' ';  
+    *(buf_p++) = ' ';
     //dprintf("%s ", de.name);
   }
+
+  inode_unlock(dp);
+
   *(buf_p - 1) = '\0';
   //dprintf("\n");
   len = buf_p - sys_buf[cur_pid] < buf_len? buf_p - sys_buf[cur_pid]: buf_len;
@@ -288,12 +305,20 @@ void sys_pwd(tf_t *tf)
     int len = 0;
     unsigned int poff;
     struct inode* curi = (struct inode*)tcb_get_cwd(get_curid());
-    struct inode* parent = dir_lookup(curi, "..", &poff);
+    struct inode* parent;
     struct dirent de;
     unsigned int off;
     unsigned int de_size = sizeof(struct dirent);
     char* p = arr[len];
-    
+
+    // Lazily initialize cwd to root if not set
+    if (curi == NULL) {
+        curi = inode_get(ROOTDEV, ROOTINO);
+        tcb_set_cwd(get_curid(), curi);
+    }
+
+    parent = dir_lookup(curi, "..", &poff);
+
     while (parent->inum != curi->inum) {
         for (off = 0; off < parent->size; off += de_size) {
             if (inode_read(parent, (char *)&de, off, de_size) != de_size)
@@ -308,14 +333,14 @@ void sys_pwd(tf_t *tf)
         curi = parent;
         parent = dir_lookup(curi, "..", &poff);
     }
-    
+
     int i;
     for (i = len - 1; i >= 0; i--) {
         p += strnlen(arr[i], sizeof(arr[i]));
         *p++ = '/';
     }
     *p = '\0';
-    
+
     pt_copyout(arr[0], get_curid(), syscall_get_arg1(tf), p - arr[0] + 1);
 }
 
@@ -332,7 +357,7 @@ void sys_rm(tf_t *tf)
 {
   int isRecursive;
   int user_addr_path;
-  int length; 
+  int length;
   int cur_pid;
   user_addr_path = syscall_get_arg2(tf);
   length = syscall_get_arg3(tf);
@@ -341,8 +366,8 @@ void sys_rm(tf_t *tf)
   length = length < PAGESIZE - 1? length: PAGESIZE - 1;
   pt_copyin(cur_pid, user_addr_path, sys_buf[cur_pid], length);
   sys_buf[cur_pid][length] = '\0'; // path
-  // TODO unfinished 
- 
+  // TODO unfinished
+
 }
 
 void sys_cp(tf_t *tf)
@@ -370,9 +395,10 @@ void sys_touch(tf_t *tf)
 void sys_sigaction(tf_t *tf)
 {
     int signum = syscall_get_arg2(tf);
-    struct sigaction *act = (struct sigaction *)syscall_get_arg3(tf);
-    struct sigaction *oldact = (struct sigaction *)syscall_get_arg4(tf);
-    struct TCB *cur_tcb = (struct TCB *)tcb_get_entry(get_curid());
+    struct sigaction *user_act = (struct sigaction *)syscall_get_arg3(tf);
+    struct sigaction *user_oldact = (struct sigaction *)syscall_get_arg4(tf);
+    unsigned int cur_pid = get_curid();
+    struct sigaction kern_act;
 
     // Validate signal number
     if (signum < 1 || signum >= NSIG) {
@@ -381,13 +407,20 @@ void sys_sigaction(tf_t *tf)
     }
 
     // Save old handler if requested
-    if (oldact != NULL) {
-        *oldact = cur_tcb->sigstate.sigactions[signum];
+    if (user_oldact != NULL) {
+        struct sigaction *cur_act = tcb_get_sigaction(cur_pid, signum);
+        if (cur_act != NULL) {
+            // Copy from kernel to user space
+            pt_copyout((void*)cur_act, cur_pid, (uintptr_t)user_oldact, sizeof(struct sigaction));
+        }
     }
 
     // Set new handler if provided
-    if (act != NULL) {
-        cur_tcb->sigstate.sigactions[signum] = *act;
+    if (user_act != NULL) {
+        // Copy from user space to kernel
+        pt_copyin(cur_pid, (uintptr_t)user_act, (void*)&kern_act, sizeof(struct sigaction));
+        KERN_INFO("[SIGACTION] Setting handler for sig %d: handler=%x\n", signum, (unsigned int)kern_act.sa_handler);
+        tcb_set_sigaction(cur_pid, signum, &kern_act);
     }
 
     syscall_set_errno(tf, E_SUCC);
@@ -397,7 +430,6 @@ void sys_kill(tf_t *tf)
 {
     int pid = syscall_get_arg2(tf);
     int signum = syscall_get_arg3(tf);
-    struct TCB *target_tcb = (struct TCB *)tcb_get_entry(pid);
 
     // Validate signal number
     if (signum < 1 || signum >= NSIG) {
@@ -406,17 +438,38 @@ void sys_kill(tf_t *tf)
     }
 
     // Validate target process
-    if (pid < 0 || pid >= NUM_IDS || target_tcb == NULL) {
+    if (pid < 0 || pid >= NUM_IDS || tcb_get_state(pid) == TSTATE_DEAD) {
         syscall_set_errno(tf, E_INVAL_PID);
         return;
     }
 
+    // SIGKILL is special - terminate immediately, cannot be caught
+    if (signum == SIGKILL) {
+        KERN_INFO("[SIGNAL] SIGKILL sent to process %d - terminating immediately\n", pid);
+
+        // Set state to DEAD
+        tcb_set_state(pid, TSTATE_DEAD);
+
+        // Remove from ready queue
+        tqueue_remove(NUM_IDS, pid);
+
+        // Clear any pending signals
+        tcb_set_pending_signals(pid, 0);
+
+        KERN_INFO("[SIGNAL] Process %d terminated by SIGKILL\n", pid);
+        syscall_set_errno(tf, E_SUCC);
+        return;
+    }
+
     // Set signal as pending
-    target_tcb->sigstate.pending_signals |= (1 << signum);
+    tcb_add_pending_signal(pid, signum);
 
     // Wake up process if it's sleeping
-    if (target_tcb->state == TSTATE_SLEEP) {
-        thread_wakeup(target_tcb);
+    if (tcb_is_sleeping(pid)) {
+        void *chan = tcb_get_channel(pid);
+        if (chan != NULL) {
+            thread_wakeup(chan);
+        }
     }
 
     syscall_set_errno(tf, E_SUCC);
@@ -424,16 +477,61 @@ void sys_kill(tf_t *tf)
 
 void sys_pause(tf_t *tf)
 {
-    struct TCB *cur_tcb = (struct TCB *)tcb_get_entry(get_curid());
-    
+    unsigned int cur_pid = get_curid();
+
     // Check if any signals are pending
-    if (cur_tcb->sigstate.pending_signals != 0) {
+    if (tcb_get_pending_signals(cur_pid) != 0) {
         syscall_set_errno(tf, E_SUCC);
         return;
     }
 
     // No signals pending, go to sleep
-    cur_tcb->state = TSTATE_SLEEP;
+    tcb_set_state(cur_pid, TSTATE_SLEEP);
     thread_yield();
+    syscall_set_errno(tf, E_SUCC);
+}
+
+void sys_sigreturn(tf_t *tf)
+{
+    unsigned int cur_pid = get_curid();
+    uint32_t saved_esp_addr, saved_eip_addr;
+    uint32_t saved_esp, saved_eip;
+
+    KERN_INFO("[SIGRETURN] Called by process %d\n", cur_pid);
+
+    // Get the saved context addresses from TCB
+    tcb_get_signal_context(cur_pid, &saved_esp_addr, &saved_eip_addr);
+
+    KERN_INFO("[SIGRETURN] saved_esp_addr=%x saved_eip_addr=%x\n", saved_esp_addr, saved_eip_addr);
+
+    if (saved_esp_addr == 0 || saved_eip_addr == 0) {
+        KERN_INFO("[SIGRETURN] No signal context to restore\n");
+        syscall_set_errno(tf, E_INVAL_ADDR);
+        return;
+    }
+
+    // Read saved ESP from user stack
+    if (pt_copyin(cur_pid, saved_esp_addr, &saved_esp, sizeof(uint32_t)) != sizeof(uint32_t)) {
+        KERN_INFO("[SIGRETURN] Failed to read saved_esp from %x\n", saved_esp_addr);
+        syscall_set_errno(tf, E_MEM);
+        return;
+    }
+
+    // Read saved EIP from user stack
+    if (pt_copyin(cur_pid, saved_eip_addr, &saved_eip, sizeof(uint32_t)) != sizeof(uint32_t)) {
+        KERN_INFO("[SIGRETURN] Failed to read saved_eip from %x\n", saved_eip_addr);
+        syscall_set_errno(tf, E_MEM);
+        return;
+    }
+
+    KERN_INFO("[SIGRETURN] Restoring context: esp=%x eip=%x\n", saved_esp, saved_eip);
+
+    // Clear the signal context in TCB
+    tcb_clear_signal_context(cur_pid);
+
+    // Restore the original trapframe
+    tf->esp = saved_esp;
+    tf->eip = saved_eip;
+
     syscall_set_errno(tf, E_SUCC);
 }

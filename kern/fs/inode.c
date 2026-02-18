@@ -15,6 +15,9 @@
 
 static void inode_trunc(struct inode*);
 
+/* Global definition of devsw (declared extern in inode.h) */
+struct devsw *devsw;
+
 struct {
   spinlock_t lock;
   struct inode inode[NINODE];
@@ -223,7 +226,7 @@ inode_unlockput(struct inode *ip)
  *
  * The content (data) associated with each inode is stored
  * in blocks on the disk. The first NDIRECT block numbers
- * are listed in ip->addrs[].  The next NINDIRECT blocks are 
+ * are listed in ip->addrs[].  The next NINDIRECT blocks are
  * listed in block ip->addrs[NDIRECT].
  */
 
@@ -281,7 +284,7 @@ inode_trunc(struct inode *ip)
       ip->addrs[i] = 0;
     }
   }
-  
+
   if(ip->addrs[NDIRECT]){
     bp = bufcache_read(ip->dev, ip->addrs[NDIRECT]);
     a = (uint32_t*)bp->data;

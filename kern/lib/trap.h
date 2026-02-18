@@ -51,7 +51,7 @@ void trap_return(tf_t *);
 
 typedef void (*trap_cb_t) (tf_t *);
 
-trap_cb_t TRAP_HANDLER[NUM_CPUS][256];
+extern trap_cb_t TRAP_HANDLER[NUM_CPUS][256];
 
 void trap_init(unsigned int cpu_idx);
 

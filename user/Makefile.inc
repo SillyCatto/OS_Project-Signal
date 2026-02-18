@@ -25,11 +25,11 @@ $(SIGNAL_TEST_OBJ): $(SIGNAL_TEST_SRC)
 	@echo + cc $<
 	$(V)$(CC) -nostdinc $(USER_CFLAGS) -c -o $@ $<
 
-$(SIGNAL_TEST_BIN): $(SIGNAL_TEST_OBJ) $(USER_OBJDIR)/lib/libuser.a
+$(SIGNAL_TEST_BIN): $(USER_LIB_OBJ) $(SIGNAL_TEST_OBJ)
 	@echo + ld $@
-	$(V)$(LD) $(USER_LDFLAGS) -o $@ $^
+	$(V)$(LD) $(USER_LDFLAGS) -o $@ $^ $(GCC_LIBS)
 
-user: lib idle pingpong fstest $(SIGNAL_TEST_BIN)
+user: lib idle pingpong fstest shell $(SIGNAL_TEST_BIN)
 	@echo All targets of user are done.
 
 install_user:

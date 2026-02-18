@@ -63,6 +63,7 @@ enum __syscall_nr {
   SYS_sigaction,    /* register signal handler */
   SYS_kill,         /* send signal to process */
   SYS_pause,        /* wait for signal */
+  SYS_sigreturn,    /* return from signal handler */
 
   MAX_SYSCALL_NR	/* XXX: always put it at the end of __syscall_nr */
 };
@@ -96,7 +97,7 @@ enum __error_nr {
   E_INVAL_CHILD_ID,
 	E_NEXIST,   // file does not exist
 	E_CREATE,   // file does not exist
-	E_FNF,      // file not found 
+	E_FNF,      // file not found
 	E_BADF,          // bad file descriptor
 	E_INVAL_SIGNUM,  /* invalid signal number */
 	E_INVAL_HANDLER, /* invalid signal handler */
