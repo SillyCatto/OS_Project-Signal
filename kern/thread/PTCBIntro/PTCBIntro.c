@@ -2,7 +2,6 @@
 #include <lib/debug.h>
 #include <lib/thread.h>
 #include <lib/string.h>
-#include <lib/signal.h>
 #include "export.h"
 
 #include <kern/fs/params.h>
@@ -23,13 +22,12 @@
  * to represent the NULL index.
  */
 struct TCB {
-  t_state state;
+  t_state state; 
   unsigned int prev;
   unsigned int next;
   void *channel;
   struct file *openfiles[NOFILE];  // Open files
   struct inode *cwd;               // Current working directory
-  struct sig_state sigstate;       // Signal state for this process
 };
 
 struct TCB TCBPool[NUM_IDS];
@@ -74,8 +72,6 @@ void tcb_init_at_id(unsigned int cpu_idx, unsigned int pid)
 	TCBPool[pid].channel = NULL;
 	memset(TCBPool[pid].openfiles, 0, sizeof(TCBPool[pid].openfiles));
 	TCBPool[pid].cwd = NULL;
-	// Initialize signal state
-	memset(&TCBPool[pid].sigstate, 0, sizeof(struct sig_state));
 }
 
 /*** NEW ***/
@@ -108,79 +104,4 @@ struct inode* tcb_get_cwd(unsigned int pid)
 void tcb_set_cwd(unsigned int pid, struct inode* d)
 {
   TCBPool[pid].cwd = d;
-}
-
-/*** Signal Accessors ***/
-
-struct sigaction* tcb_get_sigaction(unsigned int pid, int signum)
-{
-  if (signum < 0 || signum >= NSIG)
-    return NULL;
-  return &TCBPool[pid].sigstate.sigactions[signum];
-}
-
-void tcb_set_sigaction(unsigned int pid, int signum, struct sigaction *act)
-{
-  if (signum >= 0 && signum < NSIG && act != NULL) {
-    TCBPool[pid].sigstate.sigactions[signum] = *act;
-  }
-}
-
-uint32_t tcb_get_pending_signals(unsigned int pid)
-{
-  return TCBPool[pid].sigstate.pending_signals;
-}
-
-void tcb_set_pending_signals(unsigned int pid, uint32_t signals)
-{
-  TCBPool[pid].sigstate.pending_signals = signals;
-}
-
-void tcb_add_pending_signal(unsigned int pid, int signum)
-{
-  if (signum >= 0 && signum < NSIG) {
-    TCBPool[pid].sigstate.pending_signals |= (1 << signum);
-  }
-}
-
-void tcb_clear_pending_signal(unsigned int pid, int signum)
-{
-  if (signum >= 0 && signum < NSIG) {
-    TCBPool[pid].sigstate.pending_signals &= ~(1 << signum);
-  }
-}
-
-void tcb_set_signal_context(unsigned int pid, uint32_t saved_esp_addr, uint32_t saved_eip_addr)
-{
-  TCBPool[pid].sigstate.saved_esp_addr = saved_esp_addr;
-  TCBPool[pid].sigstate.saved_eip_addr = saved_eip_addr;
-  TCBPool[pid].sigstate.in_signal_handler = 1;
-}
-
-void tcb_get_signal_context(unsigned int pid, uint32_t *saved_esp_addr, uint32_t *saved_eip_addr)
-{
-  *saved_esp_addr = TCBPool[pid].sigstate.saved_esp_addr;
-  *saved_eip_addr = TCBPool[pid].sigstate.saved_eip_addr;
-}
-
-void tcb_clear_signal_context(unsigned int pid)
-{
-  TCBPool[pid].sigstate.saved_esp_addr = 0;
-  TCBPool[pid].sigstate.saved_eip_addr = 0;
-  TCBPool[pid].sigstate.in_signal_handler = 0;
-}
-
-int tcb_in_signal_handler(unsigned int pid)
-{
-  return TCBPool[pid].sigstate.in_signal_handler;
-}
-
-uint32_t tcb_is_sleeping(unsigned int pid)
-{
-  return (TCBPool[pid].state == TSTATE_SLEEP) ? 1 : 0;
-}
-
-void* tcb_get_channel(unsigned int pid)
-{
-  return TCBPool[pid].channel;
 }

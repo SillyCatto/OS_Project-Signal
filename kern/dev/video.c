@@ -6,11 +6,6 @@
 #include <lib/debug.h>
 
 #include "video.h"
-
-/* Global definitions (declared extern in video.h) */
-unsigned addr_6845;
-struct video terminal;
-
 //tmphack
 //#include<dev/serial.h>
 void
@@ -33,7 +28,7 @@ video_init(void)
 		addr_6845 = CGA_BASE;
 		dprintf("addr_6845:%x\n",addr_6845);
 	}
-
+	
 	/* Extract cursor location */
 	outb(addr_6845, 14);
 	pos = inb(addr_6845 + 1) << 8;
@@ -94,7 +89,7 @@ video_putc(int c)
 	outb(addr_6845 + 1, terminal.crt_pos >> 8);
 	outb(addr_6845, 15);
 	outb(addr_6845 + 1, terminal.crt_pos);
-
+      
 	//tmphack
         //static  int tmpcount = 0;
         /*static	int tmpcount = 0 ;

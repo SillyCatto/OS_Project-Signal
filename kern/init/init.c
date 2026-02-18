@@ -8,10 +8,6 @@
 #include <lib/thread.h>
 #include <lib/x86.h>
 
-/* Global definitions for kernel stacks (declared extern in kstack.h) */
-struct kstack bsp_kstack[NUM_CPUS];
-struct kstack proc_kstack[NUM_IDS];
-
 #ifdef TEST
 extern bool test_PKCtxNew(void);
 extern bool test_PTCBInit(void);
@@ -31,7 +27,7 @@ static void
 kern_main (void)
 {
     KERN_INFO("[BSP KERN] In kernel main.\n\n");
-
+    
     KERN_INFO("[BSP KERN] Number of CPUs in this system: %d. \n", pcpu_ncpu());
 
     int cpu_idx = get_pcpu_idx();
@@ -55,14 +51,14 @@ kern_main (void)
 
     all_ready = TRUE;
     */
-
+    
     pid = proc_create (_binary___obj_user_idle_idle_start, 1000);
     pid = proc_create (_binary___obj_user_shell_shell_start, 1000);
     KERN_INFO("CPU%d: process shell %d is created.\n", cpu_idx, pid);
     tqueue_remove (NUM_IDS, pid);
     tcb_set_state (pid, TSTATE_RUN);
     set_curid (pid);
-    kctx_switch (0, pid);
+    kctx_switch (0, pid); 
     KERN_PANIC("kern_main_ap() should never reach here.\n");
 }
 
@@ -78,7 +74,7 @@ kern_main_ap(void)
 
     KERN_INFO("[AP%d KERN] kernel_main_ap\n", cpu_idx);
 
-    cpu_booted ++;
+    cpu_booted ++;    
 }
 
 void
@@ -91,7 +87,7 @@ kern_init (uintptr_t mbi_addr)
     kern_main ();
 }
 
-void
+void 
 kern_init_ap(void (*f)(void))
 {
 	devinit_ap();

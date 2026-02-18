@@ -101,8 +101,8 @@ runcmd (char *buf, struct Trapframe *tf)
 	return 0;
 }
 
-static char *
-monitor_readline(const char *prompt)
+char *
+readline(const char *prompt)
 {
 	static char buf[256];
 	int i, c, echoing;
@@ -146,7 +146,7 @@ monitor (struct Trapframe *tf)
 
 	while (1)
 	{
-		buf = (char *) monitor_readline ("$> ");
+		buf = (char *) readline ("$> ");
 		if (buf != NULL)
 			if (runcmd (buf, tf) < 0)
 				break;

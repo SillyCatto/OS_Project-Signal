@@ -39,9 +39,9 @@ unsigned int thread_spawn(void *entry, unsigned int id, unsigned int quota)
   pid = kctx_new(entry, id, quota);
   tcb_set_state(pid, TSTATE_READY);
   tqueue_enqueue(NUM_IDS, pid);
-
+	
   spinlock_release(&sched_lk);
-
+  
   return pid;
 }
 
@@ -78,35 +78,6 @@ void thread_yield(void)
   }
 }
 
-/**
- * Exit the current thread - switch to another thread without
- * putting current thread back in the ready queue.
- * Used when a process is terminated (e.g., by SIGKILL).
- */
-void thread_exit(void)
-{
-  unsigned int old_cur_pid;
-  unsigned int new_cur_pid;
-
-  spinlock_acquire(&sched_lk);
-
-  old_cur_pid = get_curid();
-  // Do NOT set state to READY or enqueue - process is being terminated
-
-  new_cur_pid = tqueue_dequeue(NUM_IDS);
-  if (new_cur_pid == NUM_IDS) {
-    // No other threads - this shouldn't happen in normal operation
-    KERN_PANIC("thread_exit: no threads to switch to!\n");
-  }
-
-  tcb_set_state(new_cur_pid, TSTATE_RUN);
-  set_curid(new_cur_pid);
-
-  spinlock_release(&sched_lk);
-  kctx_switch(old_cur_pid, new_cur_pid);
-  // Should never return here
-}
-
 void sched_update(void)
 {
   spinlock_acquire(&sched_lk);
@@ -129,7 +100,7 @@ void sched_update(void)
 void thread_sleep (void *chan, spinlock_t *lk)
 {
   //TODO: your local variables here.
-
+  
   unsigned int curid = get_curid();
   unsigned int new_cur_pid;
   unsigned int i;
@@ -146,14 +117,14 @@ void thread_sleep (void *chan, spinlock_t *lk)
 
   //acquire the scheduler lock
   spinlock_acquire(&sched_lk);
-
+  
   //release the original lock
   spinlock_release(lk);
 
   // TODO: Go to sleep.
   tcb_set_state(curid, TSTATE_SLEEP);
   tcb_set_chan(curid, chan);
-
+  
 
   // TODO: Context switch.
   // here we assume a new ready process always exists
@@ -162,7 +133,7 @@ void thread_sleep (void *chan, spinlock_t *lk)
   set_curid(new_cur_pid);
   spinlock_release(&sched_lk);
   kctx_switch(curid, new_cur_pid);
-
+  
   // TODO: Tidy up.
   spinlock_acquire(&sched_lk);
   tcb_set_chan(curid, 0);

@@ -16,7 +16,7 @@ struct ATStruct {
    * 1: Kernel only.
    * >1: Normal (avaiable).
    */
-	unsigned int perm;
+	unsigned int perm; 
   /**
    * Whether the page is allocated.
    * 0: unallocated
@@ -34,7 +34,7 @@ static struct ATStruct AT[1 << 20];
 
 
 
-void
+void 
 mem_spinlock_init(void){
 	spinlock_init(&mem_lk);
 }
@@ -50,14 +50,14 @@ mem_unlock(void){
 }
 
 //The getter function for NUM_PAGES.
-unsigned int
+unsigned int gcc_inline
 get_nps(void)
 {
 	return NUM_PAGES;
 }
 
 //The setter function for NUM_PAGES.
-void
+void gcc_inline
 set_nps(unsigned int nps)
 {
 	NUM_PAGES = nps;

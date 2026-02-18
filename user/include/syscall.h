@@ -9,7 +9,6 @@
 #include <types.h>
 #include <x86.h>
 #include <file.h>
-#include <signal.h>
 
 static gcc_inline void
 sys_puts(const char *s, size_t len)
@@ -38,7 +37,7 @@ static gcc_inline int
 sys_sync_receive(int send_pid, char* addr, size_t len)
 {
        int errno, length;
-	asm volatile("int %2"
+	asm volatile("int %2" 
                      : "=a" (errno),
                        "=b" (length)
 		     : "i" (T_SYSCALL),
@@ -290,7 +289,7 @@ sys_readline(char* start)
 		     : "cc", "memory");
 	return errno ? -1: 0;
 }
-
+ 
 static gcc_inline int
 sys_ls(char * buf, int buf_len)
 {
@@ -305,7 +304,7 @@ sys_ls(char * buf, int buf_len)
 		     : "cc", "memory");
 	return errno ? -1: len;
 }
-
+ 
 static gcc_inline int
 sys_pwd(char * buf)
 {
@@ -406,49 +405,6 @@ sys_touch(void)
 		        "a" (SYS_touch)
 		      : "cc", "memory");
 	return errno ? -1: 0;
-}
-
-/* Signal system calls */
-
-static gcc_inline int
-sys_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
-{
-	int errno;
-	asm volatile ("int %1"
-		      : "=a" (errno)
-		      : "i" (T_SYSCALL),
-		        "a" (SYS_sigaction),
-		        "b" (signum),
-		        "c" (act),
-		        "d" (oldact)
-		      : "cc", "memory");
-	return errno ? -1 : 0;
-}
-
-static gcc_inline int
-sys_kill(int pid, int signum)
-{
-	int errno;
-	asm volatile ("int %1"
-		      : "=a" (errno)
-		      : "i" (T_SYSCALL),
-		        "a" (SYS_kill),
-		        "b" (pid),
-		        "c" (signum)
-		      : "cc", "memory");
-	return errno ? -1 : 0;
-}
-
-static gcc_inline int
-sys_pause(void)
-{
-	int errno;
-	asm volatile ("int %1"
-		      : "=a" (errno)
-		      : "i" (T_SYSCALL),
-		        "a" (SYS_pause)
-		      : "cc", "memory");
-	return errno ? -1 : 0;
 }
 
 

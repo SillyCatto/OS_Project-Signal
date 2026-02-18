@@ -137,7 +137,6 @@ void lcr0(uint32_t val);
 uint32_t rcr0(void);
 uint32_t rcr2(void);
 void lcr3(uint32_t val);
-void invlpg(uintptr_t addr);
 void lcr4(uint32_t val);
 uint32_t rcr4(void);
 uint8_t inb(int port);

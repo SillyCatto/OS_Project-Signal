@@ -45,7 +45,7 @@ devinit (uintptr_t mbi_addr)
 
 	intr_init();
 	KERN_INFO("[BSP KERN] INTR initialized\n");
-
+	
 	trap_init(0);
 
 	pmmap_init (mbi_addr);
@@ -55,12 +55,11 @@ devinit (uintptr_t mbi_addr)
 	inode_init();         // inode cache
 	ide_init ();
 	KERN_INFO("[BSP KERN] IDE disk driver initialized\n");
-	// Note: log_init() is called lazily in sys_open when first file is opened
-        ipc_init();
+        ipc_init(); 
 	KERN_INFO("[BSP KERN] IPC initialized\n");
 }
 
-void
+void 
 devinit_ap (void)
 {
 	/* Figure out the current (booting) kernel stack) */
@@ -75,7 +74,7 @@ devinit_ap (void)
 
   	pcpu_init();
   	KERN_INFO("[AP%d KERN] PCPU initialized\n", ks->cpu_idx);
-
+	
 	intr_init();
   	KERN_INFO("[AP%d KERN] INTR initialized.\n", ks->cpu_idx);
 

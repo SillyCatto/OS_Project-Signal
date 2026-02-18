@@ -3,9 +3,6 @@
 #include <dev/intr.h>
 #include "import.h"
 
-// Global definition of TRAP_HANDLER (declared extern in trap.h)
-trap_cb_t TRAP_HANDLER[NUM_CPUS][256];
-
 int inited = FALSE;
 
 void
@@ -38,7 +35,7 @@ trap_init(unsigned int cpu_idx){
   } else {
     KERN_INFO("[AP%d KERN] Register exception handlers ... \n", cpu_idx);
   }
-
+  
   trap_handler_register(cpu_idx, T_GPFLT, exception_handler);
   trap_handler_register(cpu_idx, T_PGFLT, exception_handler);
   trap_handler_register(cpu_idx, T_SYSCALL, syscall_dispatch);
@@ -75,7 +72,7 @@ trap_init(unsigned int cpu_idx){
   } else {
     KERN_INFO("[AP%d KERN] Register interrupt handlers ... \n", cpu_idx);
   }
-
+        
   trap_handler_register(cpu_idx, T_IRQ0+IRQ_SPURIOUS, interrupt_handler);
   trap_handler_register(cpu_idx, T_IRQ0+IRQ_TIMER, interrupt_handler);
   trap_handler_register(cpu_idx, T_IRQ0+IRQ_KBD, interrupt_handler);

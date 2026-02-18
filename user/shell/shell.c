@@ -13,13 +13,16 @@
 #include <syscall.h>
 #include <x86.h>
 #include "signal.h"
-
-/* Stub definitions for POSIX types not available in mCertikOS */
-#define O_RDONLY    0x000
-#define O_WRONLY    0x001
-#define O_RDWR      0x002
-#define O_CREATE    0x200
-#define O_TRUNC     0x400
+#include <unistd.h>
+#include <fcntl.h>
+#include <assert.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <dirent.h>
+#include <pwd.h>
+#include <grp.h>
 
 #define BUFLEN 1024
 #define ARGUMENT_LEN 128
@@ -27,22 +30,6 @@
 #define CMDBUF_SIZE	80
 #define WHITESPACE "\t\r\n "
 #define MAXARGS 16
-
-/* Forward declarations */
-void signal_handler(int signum);
-
-/* Helper function to convert string to int (wrapper for mCertikOS atoi) */
-static int str_to_int(const char *s) {
-    int result = 0;
-    atoi(s, &result);
-    return result;
-}
-
-/* Stub for getpid - returns current process id (use syscall if available) */
-static int getpid(void) {
-    return 1;  /* Stub: in a real implementation, add SYS_getpid syscall */
-}
-
 static int  runcmd (char *buf);
 int shell_ls(int argc, char ** argv);
 int shell_pwd(int argc, char **argv);
@@ -58,7 +45,6 @@ int shell_write(int argc, char **argv);
 int shell_append(int argc, char **argv);
 int shell_kill(int argc, char **argv);
 int shell_trap(int argc, char **argv);
-int shell_spawn(int argc, char **argv);
 
 int _shell_rm(char * path, int isRecursive);
 int rm_file(char * filename);
@@ -77,11 +63,11 @@ struct Command
 {
 	const char* name;
 	const char* desc;
-	int
+	int 
 	(*func) (int argc, char** argv);
 };
 
-static struct Command commands[] =
+static struct Command commands[] = 
 {
 	{"ls","list all files and directories under working directory", shell_ls},
 	{"pwd","print working directory", shell_pwd},
@@ -96,8 +82,7 @@ static struct Command commands[] =
         {"append", "append <string> <filename> \n\t append a string to file", shell_append},
         {"help", "help \n\t print this help message", shell_help},
         {"kill", "kill <signal> <pid> \n\t send signal to process", shell_kill},
-        {"trap", "trap <signum> <handler> \n\t register signal handler", shell_trap},
-        {"spawn", "spawn <elf_id> \n\t spawn a new process (1=ping, 2=pong, 3=ding)", shell_spawn}
+        {"trap", "trap <signum> <handler> \n\t register signal handler", shell_trap}
 };
 
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
@@ -124,7 +109,7 @@ int shell_ls(int argc, char** argv)
           printf("%s\n", shell_buf);
           sys_chdir(path);
         }else{
-          printf("ls: too many arguments.\n");
+          printf("ls: too many arguments.\n"); 
         }
         return 0;
 
@@ -132,10 +117,10 @@ int shell_ls(int argc, char** argv)
 
 int shell_pwd(int argc, char ** argv)
 {
-
+        
 	sys_pwd(shell_buf);
         printf("%s\n",shell_buf);
-	return 0;
+	return 0;	
 }
 
 int shell_cd(int argc, char** argv)
@@ -148,7 +133,7 @@ int shell_cd(int argc, char** argv)
 	else {
 		strcpy(path, argv[1]);
 	//	printf("%s\n",path);
-		sys_chdir(path);
+		sys_chdir(path);	
 	}
 
 }
@@ -169,7 +154,7 @@ int shell_cp(int argc, char** argv)
     dest_path = argv[2];
     _shell_cp(dest_path, src_path, 0);
     return 0;
-  }
+  }	
   else{// recursive
     if(strcmp(argv[1], "-r")){
       printf("cp: invalid option. try '-r' ?\n");
@@ -212,7 +197,7 @@ int _shell_cp(char * dest_path, char * src_path, int isRecursive){
         p = path + strlen(path);
         *(p++) = '/';
         strcpy(p, filename);
-        _shell_cp(path, src_path, isRecursive);
+        _shell_cp(path, src_path, isRecursive); 
     }else{
         // dest is a file or does not exist
         cp_file(dest_path, src_path);
@@ -229,7 +214,7 @@ int _shell_cp(char * dest_path, char * src_path, int isRecursive){
             p = path + strlen(path);
             *(p++) = '/';
             strcpy(p, filename);
-            _shell_cp(path, src_path, isRecursive);
+            _shell_cp(path, src_path, isRecursive);            
           }else{
             // dest is a file
             printf("cp: can not copy a dir to a file '%s'.\n", dest_path);
@@ -257,7 +242,7 @@ int _shell_cp(char * dest_path, char * src_path, int isRecursive){
 
               _shell_cp(dest_path_buf, src_path_buf, isRecursive);
             }
-            p += strlen(p) + 1; //
+            p += strlen(p) + 1; // 
           }
        }
     }else{
@@ -341,13 +326,13 @@ int _shell_rm(char *path, int isRecursive){
     }
     else{
       // path is a non empty directory
-      // subdirectory/subfile names are stored in shell_buf, seperated by '\0'
+      // subdirectory/subfile names are stored in shell_buf, seperated by '\0' 
       // chdir, go to next layer
-      sys_chdir(path);
+      sys_chdir(path); 
       len = ls_dir(rm_buf, NULL);
       sub_path = rm_buf;
       while(sub_path - rm_buf < len){
-        if(strcmp(sub_path, ".") && strcmp(sub_path, "..")){
+        if(strcmp(sub_path, ".") && strcmp(sub_path, "..")){ 
           _shell_rm(sub_path, isRecursive);
         }
         sub_path += strlen(sub_path) + 1;
@@ -384,13 +369,13 @@ int ls_dir(char* buf, char * path){
    char pwd[BUFLEN];
    // list current dir
    if(path == NULL){
-     len  = sys_ls(buf, BUFLEN);
+     len  = sys_ls(buf, BUFLEN); 
    }else{
       //list target dir
      sys_pwd(pwd);
      sys_chdir(path);
      len = sys_ls(buf, BUFLEN);
-     sys_chdir(pwd);
+     sys_chdir(pwd); 
    }
    int i = 0;
    while(i < len){
@@ -433,14 +418,14 @@ int shell_mkdir(int argc, char** argv)
 	int i;
 	if (argc == 1)
 		printf ("mkdir failed, no path\n");
-
+	
 	for (i = 1; i < argc; i++){
 		if (sys_mkdir(argv[i]) == 0)
 		;	//printf("make dir succeed.\n");
 		else
 			printf("make dir failed.\n");
 	}
-
+	
 	return 0;
 }
 
@@ -467,7 +452,7 @@ int _shell_cat(char * path){
    if(fd == -1){
         // file does not exist
         return -1;
-   }
+   } 
    size_read = read(fd, buf, sizeof(buf) - 1);
    buf[size_read] = '\0';
    printf("%s\n", buf);
@@ -493,7 +478,7 @@ int shell_touch(int argc, char** argv)
   		} else {
 			close(open(argv[i], O_CREATE));
 			//printf("%s file create\n", argv[i]);
-		}
+		}	
 	}
 	return 0;
 }
@@ -520,7 +505,7 @@ int shell_append(int argc, char** argv) {
   if (argc == 1) {
     printf("append failed, too few arguments.\n");
     return 0;
-  }
+  } 
   int fd = open(argv[2], O_RDONLY);
   if (fd >= 0) {
     char buf[1000];
@@ -550,32 +535,32 @@ void shell_test() {
     sa.sa_handler = signal_handler;
     sa.sa_flags = 0;
     sa.sa_mask = 0;
-
+    
     if (sigaction(SIGUSR1, &sa, NULL) < 0) {
         printf("Failed to register signal handler\n");
         return;
     }
-
+    
     printf("Registered handler for SIGUSR1\n");
     printf("Sending SIGUSR1 to self...\n");
     kill(getpid(), SIGUSR1);
-
+    
     // Test case 2: Signal blocking
     printf("\nTest 2: Signal blocking\n");
     struct sigaction sa2;
     sa2.sa_handler = signal_handler;
     sa2.sa_flags = 0;
     sa2.sa_mask = (1 << SIGUSR2);  // Block SIGUSR2
-
+    
     if (sigaction(SIGUSR2, &sa2, NULL) < 0) {
         printf("Failed to register signal handler\n");
         return;
     }
-
+    
     printf("Registered handler for SIGUSR2 (blocked)\n");
     printf("Sending SIGUSR2 to self...\n");
     kill(getpid(), SIGUSR2);
-
+    
     // Test case 3: pause() functionality
     printf("\nTest 3: pause() functionality\n");
     printf("Process will pause until SIGUSR1 is received...\n");
@@ -607,7 +592,7 @@ int cp_file(char* dest_filename, char* src_filename) {
   read(fd, buf, 1000);
   close(fd);
   fd = open(dest_filename, O_CREATE|O_RDWR);
-  write(fd, buf, strlen(buf));
+  write(fd, buf, strlen(buf)); 
   close(fd);
   return 0;
 }
@@ -618,7 +603,7 @@ void shell_readline(char* buf) {
   sys_readline(buf);
 }
 
-static int
+static int 
 runcmd (char *buf)
 {
 	int argc;
@@ -627,7 +612,7 @@ runcmd (char *buf)
 
 	argc = 0;
 	argv[argc] = 0;
-
+	
 	while(1)
 	{
 		while (*buf && strchr(WHITESPACE, *buf))
@@ -644,7 +629,7 @@ runcmd (char *buf)
 		while (*buf && !strchr(WHITESPACE, *buf))
 			buf++;
 	}
-	argv[argc] = 0;
+	argv[argc] = 0;	
 	if (argc == 0)
 		return 0;
 	for (i = 0; i < NCOMMANDS; i++)
@@ -666,7 +651,7 @@ int ipc_test(){
         printf ("ping in process %d.\n", ping_pid);
     else
         printf ("Failed to launch ping.\n");
-
+    
     if ((pong_pid = spawn (2, 1000)) != -1)
         printf ("pong in process %d.\n", pong_pid);
     else
@@ -688,13 +673,13 @@ int main (int argc, char** argv)
         printf("********This is the final project for CPSC 422/522 Operating Systems in Yale********\n");
         printf("********Author: Bo Song, Haoliang Zhang********\n");
         printf("********Date: 12/18/2015 ********\n");
-	//close(open("usertests.ran", O_CREATE));  // Disabled - requires proper cwd init
-
+	close(open("usertests.ran", O_CREATE));
+    
 
 
         if(mode == 1){
            shell_test();
-           return 0;
+           return 0; 
        }
         else if(mode == 2){
            ipc_test();
@@ -710,133 +695,56 @@ int main (int argc, char** argv)
 	}
 }
 
-// int shell_kill(int argc, char **argv)
-// {
-//     if (argc != 3) {
-//         printf("Usage: kill <signal> <pid>\n");
-//         return -1;
-//     }
-
-//     int signum = str_to_int(argv[1]);
-//     int pid = str_to_int(argv[2]);
-
-//     if (signum < 1 || signum >= NSIG) {
-//         printf("Invalid signal number\n");
-//         return -1;
-//     }
-
-//     if (kill(pid, signum) < 0) {
-//         printf("Failed to send signal\n");
-//         return -1;
-//     }
-
-//     return 0;
-// }
-
 int shell_kill(int argc, char **argv)
 {
-    if (argc < 3) {
-        printf("Usage: kill -<signal> <pid>\n");
-        printf("Example: kill -9 2\n");
-        return;
+    if (argc != 3) {
+        printf("Usage: kill <signal> <pid>\n");
+        return -1;
     }
 
-    int sig = 0;
-    int pid = 0;
+    int signum = atoi(argv[1]);
+    int pid = atoi(argv[2]);
 
-    // Parse signal number - handle "-N" format
-    if (argv[1][0] == '-') {
-        // Parse the number after the '-'
-        sig = str_to_int(&argv[1][1]);
-    } else {
-        // Try parsing as just a number
-        sig = str_to_int(argv[1]);
+    if (signum < 1 || signum >= NSIG) {
+        printf("Invalid signal number\n");
+        return -1;
     }
 
-    // Parse PID
-    pid = str_to_int(argv[2]);
-
-    // Validate signal number (1-31)
-    if (sig < 1 || sig > 31) {
-        printf("Invalid signal number: %d (must be 1-31)\n", sig);
-        return;
+    if (kill(pid, signum) < 0) {
+        printf("Failed to send signal\n");
+        return -1;
     }
 
-    // Validate PID
-    if (pid < 1 || pid > 63) {
-        printf("Invalid PID: %d (must be 1-63)\n", pid);
-        return;
-    }
-
-    printf("Sending signal %d to process %d...\n", sig, pid);
-
-    int result = kill(pid, sig);
-    if (result == 0) {
-        printf("Signal sent successfully.\n");
-    } else {
-        printf("Failed to send signal (error: %d)\n", result);
-    }
+    return 0;
 }
 
 void signal_handler(int signum)
 {
-    printf("\n*** Received signal %d ***\n", signum);
-    printf(">:");  // Reprint prompt
+    printf("Received signal %d\n", signum);
 }
 
 int shell_trap(int argc, char **argv)
 {
-    if (argc < 2) {
-        printf("Usage: trap <signum>\n");
-        printf("Example: trap 2   (register handler for SIGINT)\n");
+    if (argc != 3) {
+        printf("Usage: trap <signum> <handler>\n");
         return -1;
     }
 
-    int signum = str_to_int(argv[1]);
+    int signum = atoi(argv[1]);
+    void (*handler)(int) = (void (*)(int))strtoul(argv[2], NULL, 0);
 
-    if (signum < 1 || signum >= 32) {
-        printf("Invalid signal number: %d (must be 1-31)\n", signum);
+    if (signum < 1 || signum >= NSIG) {
+        printf("Invalid signal number\n");
         return -1;
     }
 
     struct sigaction sa;
-    sa.sa_handler = signal_handler;
+    sa.sa_handler = handler;
     sa.sa_flags = 0;
     sa.sa_mask = 0;
 
-    printf("Registering handler for signal %d at address %x...\n", signum, (unsigned int)signal_handler);
-
     if (sigaction(signum, &sa, NULL) < 0) {
         printf("Failed to register signal handler\n");
-        return -1;
-    }
-
-    printf("Handler registered successfully.\n");
-    return 0;
-}
-
-int shell_spawn(int argc, char **argv)
-{
-    if (argc < 2) {
-        printf("Usage: spawn <elf_id>\n");
-        printf("  elf_id: 1=ping, 2=pong, 3=ding\n");
-        return -1;
-    }
-
-    int elf_id = str_to_int(argv[1]);
-
-    if (elf_id < 1 || elf_id > 5) {
-        printf("Invalid elf_id: %d (must be 1-5)\n", elf_id);
-        return -1;
-    }
-
-    printf("Spawning process with elf_id %d...\n", elf_id);
-
-    pid_t new_pid = spawn(elf_id, 1000);
-    if (new_pid != -1) {
-        printf("Process spawned with PID %d\n", new_pid);
-    } else {
-        printf("Failed to spawn process\n");
         return -1;
     }
 

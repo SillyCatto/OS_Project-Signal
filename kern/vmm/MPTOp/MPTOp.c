@@ -16,11 +16,11 @@ unsigned int get_ptbl_entry_by_va(unsigned int proc_index, unsigned int vaddr)
     pde_index = vaddr / (4096 * 1024);
     pde = get_pdir_entry(proc_index, pde_index);
     if (pde == 0)
-        return 0;
+      return 0;
     pte_index = (vaddr / 4096) % 1024;
     ptbl_entry = get_ptbl_entry(proc_index, pde_index, pte_index);
     return ptbl_entry;
-}
+}         
 
 // returns the page directory entry corresponding to the given virtual address
 unsigned int get_pdir_entry_by_va(unsigned int proc_index, unsigned int vaddr)
@@ -67,7 +67,7 @@ void set_pdir_entry_by_va(unsigned int proc_index, unsigned int vaddr, unsigned 
     unsigned int pde_index;
     pde_index = vaddr / (4096 * 1024);
     set_pdir_entry(proc_index, pde_index, page_index);
-}
+}   
 
 // initializes the identity page table
 // the permission for the kernel memory should be PTE_P, PTE_W, and PTE_G,

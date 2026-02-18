@@ -90,7 +90,7 @@ struct devsw {
   int (*write)(struct inode*, char*, int);
 };
 
-extern struct devsw *devsw;
+struct devsw *devsw;
 
 void inode_init(void);
 
@@ -131,7 +131,7 @@ void inode_unlockput(struct inode *ip);
  *
  * The content (data) associated with each inode is stored
  * in blocks on the disk. The first NDIRECT block numbers
- * are listed in ip->addrs[].  The next NINDIRECT blocks are
+ * are listed in ip->addrs[].  The next NINDIRECT blocks are 
  * listed in block ip->addrs[NDIRECT].
  */
 
