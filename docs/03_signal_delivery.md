@@ -347,7 +347,7 @@ User Stack (after deliver_signal):
   [ESP+4] = 2              ; Signal number (handler argument)
   [ESP+8] = B8 42 00 00... ; Trampoline code
 ```
-```
+
 
 ---
 
