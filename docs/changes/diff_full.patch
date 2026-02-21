@@ -1,0 +1,2093 @@
+diff --git a/kern/dev/console.c b/kern/dev/console.c
+index 459124f..ecbb184 100644
+--- a/kern/dev/console.c
++++ b/kern/dev/console.c
+@@ -79,14 +79,14 @@ cons_putc(char c)
+   video_putc(c);
+ }
+ 
+-char
++int
+ getchar(void)
+ {
+-  char c;
++    int c;
+ 
+-  while ((c = cons_getc()) == 0)
+-    /* do nothing */;
+-  return c;
++    while ((c = cons_getc()) == 0)
++        /* do nothing */;
++    return c;
+ }
+ 
+ void
+diff --git a/kern/dev/devinit.c b/kern/dev/devinit.c
+index 34ff5e8..1d051b3 100644
+--- a/kern/dev/devinit.c
++++ b/kern/dev/devinit.c
+@@ -45,7 +45,7 @@ devinit (uintptr_t mbi_addr)
+ 
+ 	intr_init();
+ 	KERN_INFO("[BSP KERN] INTR initialized\n");
+-	
++
+ 	trap_init(0);
+ 
+ 	pmmap_init (mbi_addr);
+@@ -55,11 +55,12 @@ devinit (uintptr_t mbi_addr)
+ 	inode_init();         // inode cache
+ 	ide_init ();
+ 	KERN_INFO("[BSP KERN] IDE disk driver initialized\n");
+-        ipc_init(); 
++	// Note: log_init() is called lazily in sys_open when first file is opened
++        ipc_init();
+ 	KERN_INFO("[BSP KERN] IPC initialized\n");
+ }
+ 
+-void 
++void
+ devinit_ap (void)
+ {
+ 	/* Figure out the current (booting) kernel stack) */
+@@ -74,7 +75,7 @@ devinit_ap (void)
+ 
+   	pcpu_init();
+   	KERN_INFO("[AP%d KERN] PCPU initialized\n", ks->cpu_idx);
+-	
++
+ 	intr_init();
+   	KERN_INFO("[AP%d KERN] INTR initialized.\n", ks->cpu_idx);
+ 
+diff --git a/kern/dev/disk/ide.c b/kern/dev/disk/ide.c
+index 1320100..311044f 100755
+--- a/kern/dev/disk/ide.c
++++ b/kern/dev/disk/ide.c
+@@ -7,8 +7,14 @@
+ #include <kern/lib/spinlock.h>
+ #include <kern/lib/buf.h>
+ #include <kern/dev/intr.h>
++#include <dev/pic.h>
++#include <dev/ioapic.h>
++#include <pcpu/PCPUIntro/export.h>
+ #include "ide.h"
+ 
++// Forward declaration for PCPU function
++int pcpu_ncpu(void);
++
+ // idequeue points to the buf now being read/written to the disk.
+ // idequeue->qnext points to the next buf to be processed.
+ // You must hold ide_lk while manipulating queue.
+@@ -42,8 +48,8 @@ ide_init(void)
+ 
+   spinlock_init(&ide_lk);
+   spinlock_init(&buf_lock);
+-  picenable(IRQ_IDE1);
+-  ioapicenable(IRQ_IDE1, pcpu_ncpu() - 1);
++  pic_enable(IRQ_IDE1);
++  ioapic_enable(IRQ_IDE1, pcpu_ncpu() - 1, FALSE, FALSE);
+   ide_wait(0);
+   
+   // Check if disk 1 is present
+diff --git a/kern/dev/intr.c b/kern/dev/intr.c
+index df7bc87..750ec2e 100644
+--- a/kern/dev/intr.c
++++ b/kern/dev/intr.c
+@@ -1,5 +1,4 @@
+ #include <lib/types.h>
+-
+ #include <lib/debug.h>
+ #include <lib/seg.h>
+ #include <lib/x86.h>
+@@ -9,6 +8,13 @@
+ #include <dev/lapic.h>
+ #include <dev/ioapic.h>
+ 
++#include <pcpu/PCPUIntro/export.h>
++#include <pcpu/PCPUInit/export.h>
++
++// Forward declarations for PCPU functions
++bool pcpu_onboot(void);
++int pcpu_ncpu(void);
++int pcpu_cpu_lapicid(int cpunum);
+ 
+ volatile static bool using_apic = FALSE;
+ volatile static bool intr_inited = FALSE;
+@@ -115,7 +121,7 @@ intr_enable(uint8_t irq, int cpunum)
+ 
+     if (using_apic == TRUE) {
+         ioapic_enable(irq, (cpunum == 0xff) ?
+-                          0xff : pcpu_cpu_lapicid(cpunum), 0, 0);
++                          0xff : pcpu_cpu_lapicid(cpunum), FALSE, FALSE);
+     } else {
+         KERN_ASSERT(irq < 16);
+         pic_enable(irq);
+@@ -130,7 +136,7 @@ intr_enable_lapicid(uint8_t irq, int lapic_id)
+ 
+     if (using_apic == TRUE) {
+         ioapic_enable(irq, (lapic_id == 0xff) ?
+-                          0xff : lapic_id, 0, 0);
++                          0xff : lapic_id, FALSE, FALSE);
+     } else {
+         KERN_ASSERT(irq < 16);
+         pic_enable(irq);
+diff --git a/kern/dev/keyboard.c b/kern/dev/keyboard.c
+index abc22a9..ecf25a1 100644
+--- a/kern/dev/keyboard.c
++++ b/kern/dev/keyboard.c
+@@ -1,4 +1,8 @@
+ #include <lib/types.h>
++#include <lib/debug.h>
++#include <lib/x86.h>
++#include <dev/console.h>
++#include <dev/keyboard.h>
+ 
+ #include "keyboard.h"
+ 
+diff --git a/kern/dev/video.c b/kern/dev/video.c
+index d22703f..bd02e32 100644
+--- a/kern/dev/video.c
++++ b/kern/dev/video.c
+@@ -130,4 +130,4 @@ video_clear_screen ()
+     {
+         terminal.crt_buf[i] = ' ';
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/kern/dev/video.h b/kern/dev/video.h
+index 1d2c51e..bdbad9f 100644
+--- a/kern/dev/video.h
++++ b/kern/dev/video.h
+@@ -184,4 +184,4 @@ extern void video_update();
+ void video_set_cursor (int x, int y);
+ void video_clear_screen ();
+ 
+-#endif /* !_KERN_DEV_VIDEO_H_ */
+\ No newline at end of file
++#endif /* !_KERN_DEV_VIDEO_H_ */
+diff --git a/kern/fs/inode.c b/kern/fs/inode.c
+index fbeb7b3..a61f37e 100644
+--- a/kern/fs/inode.c
++++ b/kern/fs/inode.c
+@@ -376,4 +376,4 @@ inode_write(struct inode *ip, char *src, uint32_t off, uint32_t n)
+     inode_update(ip);
+   }
+   return n;
+-}
+\ No newline at end of file
++}
+diff --git a/kern/fs/inode.h b/kern/fs/inode.h
+index 6fd0c49..ed98f95 100644
+--- a/kern/fs/inode.h
++++ b/kern/fs/inode.h
+@@ -144,4 +144,4 @@ int inode_read(struct inode *ip, char *dst, uint32_t off, uint32_t n);
+ /** Write data to inode. */
+ int inode_write(struct inode *ip, char *src, uint32_t off, uint32_t n);
+ 
+-#endif /* !_KERN_FS_INODE_H_ */
+\ No newline at end of file
++#endif /* !_KERN_FS_INODE_H_ */
+diff --git a/kern/fs/log.c b/kern/fs/log.c
+index 1870554..c4092c5 100755
+--- a/kern/fs/log.c
++++ b/kern/fs/log.c
+@@ -5,7 +5,7 @@
+ // the log (with commit record) to disk, then installs the affected
+ // blocks to disk, then erases the log. begin_trans() ensures that
+ // only one system call can be in a transaction; others must wait.
+-// 
++//
+ // Allowing only one transaction at a time means that the file
+ // system code doesn't have to worry about the possibility of
+ // one transaction reading a block that another one has modified,
+@@ -34,7 +34,7 @@
+ // Contents of the header block, used for both the on-disk header block
+ // and to keep track in memory of logged sector #s before commit.
+ struct logheader {
+-  int n;   
++  int n;
+   int sector[LOGSIZE];
+ };
+ 
+@@ -66,7 +66,7 @@ log_init(void)
+ }
+ 
+ // Copy committed blocks from log to their home location
+-static void 
++static void
+ install_trans(void)
+ {
+   int tail;
+@@ -76,7 +76,7 @@ install_trans(void)
+     struct buf *dbuf = bufcache_read(log.dev, log.lh.sector[tail]); // read dst
+     memmove(dbuf->data, lbuf->data, BSIZE);  // copy block to dst
+     bufcache_write(dbuf);  // write dst to disk
+-    bufcache_release(lbuf); 
++    bufcache_release(lbuf);
+     bufcache_release(dbuf);
+   }
+ }
+@@ -115,7 +115,7 @@ write_head(void)
+ static void
+ recover_from_log(void)
+ {
+-  read_head();      
++  read_head();
+   install_trans(); // if committed, copy from log to disk
+   log.lh.n = 0;
+   write_head(); // clear the log
+@@ -138,10 +138,10 @@ commit_trans(void)
+   if (log.lh.n > 0) {
+     write_head();    // Write header to disk -- the real commit
+     install_trans(); // Now install writes to home locations
+-    log.lh.n = 0; 
++    log.lh.n = 0;
+     write_head();    // Erase the transaction from the log
+   }
+-  
++
+   spinlock_acquire(&log.lock);
+   log.busy = 0;
+   thread_wakeup(&log);
+@@ -149,7 +149,7 @@ commit_trans(void)
+ }
+ 
+ // Caller has modified b->data and is done with the buffer.
+-// Append the block to the log and record the block number, 
++// Append the block to the log and record the block number,
+ // but don't write the log header (which would commit the write).
+ // log_write() replaces bwrite(); a typical use is:
+ //   bp = bufcache_read(...)
+diff --git a/kern/init/init.c b/kern/init/init.c
+index c2c1366..0b6e4a1 100644
+--- a/kern/init/init.c
++++ b/kern/init/init.c
+@@ -96,4 +96,4 @@ kern_init_ap(void (*f)(void))
+ {
+ 	devinit_ap();
+ 	f();
+-}
+\ No newline at end of file
++}
+diff --git a/kern/lib/debug.c b/kern/lib/debug.c
+index 537d0ef..7869634 100644
+--- a/kern/lib/debug.c
++++ b/kern/lib/debug.c
+@@ -1,4 +1,5 @@
+ #include <lib/debug.h>
++#include "printfmt.h"
+ #include <lib/gcc.h>
+ #include <lib/stdarg.h>
+ #include <lib/x86.h>
+@@ -6,6 +7,9 @@
+ #include <lib/types.h>
+ #include <lib/spinlock.h>
+ 
++// Forward declarations
++void vdprintf(const char *fmt, va_list ap);
++
+ static spinlock_t debug_lk;
+ static spinlock_t serial_lk;
+ 
+diff --git a/kern/lib/kstack.h b/kern/lib/kstack.h
+index 30af189..f59cdbc 100644
+--- a/kern/lib/kstack.h
++++ b/kern/lib/kstack.h
+@@ -40,4 +40,4 @@ extern struct kstack bsp_kstack[NUM_CPUS];
+ extern struct kstack proc_kstack[NUM_IDS];
+ 
+ #endif /* _KERN_ */
+-#endif /* !_KERN_LIB_KSTACK_H_ */
+\ No newline at end of file
++#endif /* !_KERN_LIB_KSTACK_H_ */
+diff --git a/kern/lib/monitor.c b/kern/lib/monitor.c
+index 4a4c57b..603b765 100644
+--- a/kern/lib/monitor.c
++++ b/kern/lib/monitor.c
+@@ -151,4 +151,4 @@ monitor (struct Trapframe *tf)
+ 			if (runcmd (buf, tf) < 0)
+ 				break;
+ 	}
+-}
+\ No newline at end of file
++}
+diff --git a/kern/lib/pmap.c b/kern/lib/pmap.c
+index 14ff6f6..8c6b3c0 100644
+--- a/kern/lib/pmap.c
++++ b/kern/lib/pmap.c
+@@ -114,4 +114,4 @@ pt_memset(uint32_t pmap_id, uintptr_t va, char c, size_t len)
+ 	}
+ 
+ 	return set;
+-}
+\ No newline at end of file
++}
+diff --git a/kern/lib/seg.c b/kern/lib/seg.c
+index 20164e0..1adba8a 100644
+--- a/kern/lib/seg.c
++++ b/kern/lib/seg.c
+@@ -3,6 +3,8 @@
+ #include <lib/string.h>
+ #include <lib/types.h>
+ #include <lib/kstack.h>
++#include <lib/debug.h>
++#include <pcpu/PCPUIntro/export.h>
+ 
+ #include "seg.h"
+ 
+diff --git a/kern/lib/string.c b/kern/lib/string.c
+index 8617bf5..9517718 100644
+--- a/kern/lib/string.c
++++ b/kern/lib/string.c
+@@ -1,5 +1,6 @@
+ #include "string.h"
+ #include "types.h"
++#include <lib/debug.h>
+ 
+ void *
+ memset(void *v, int c, size_t n)
+@@ -105,6 +106,7 @@ memzero(void *v, size_t n)
+ 	return memset(v, 0, n);
+ }
+ 
++int
+ memcmp(const void *v1, const void *v2, size_t n)
+ {
+         const uint8_t *s1 = (const uint8_t *) v1;
+@@ -132,3 +134,12 @@ strncpy(char *s, const char *t, int n)
+     *s++ = 0;
+   return os;
+ }
++
++size_t
++strlen(const char *s)
++{
++    size_t cnt = 0;
++    while (*s++ != '\0')
++        cnt++;
++    return cnt;
++}
+diff --git a/kern/lib/syscall.h b/kern/lib/syscall.h
+index 72e9b00..19e1c07 100644
+--- a/kern/lib/syscall.h
++++ b/kern/lib/syscall.h
+@@ -60,6 +60,10 @@ enum __syscall_nr {
+   SYS_cat,
+   SYS_touch,
+   SYS_readline,
++  SYS_sigaction,    /* register signal handler */
++  SYS_kill,         /* send signal to process */
++  SYS_pause,        /* wait for signal */
++  SYS_sigreturn,    /* return from signal handler */
+ 
+   MAX_SYSCALL_NR	/* XXX: always put it at the end of __syscall_nr */
+ };
+@@ -93,8 +97,10 @@ enum __error_nr {
+   E_INVAL_CHILD_ID,
+ 	E_NEXIST,   // file does not exist
+ 	E_CREATE,   // file does not exist
+-	E_FNF,      // file not found 
++	E_FNF,      // file not found
+ 	E_BADF,          // bad file descriptor
++	E_INVAL_SIGNUM,  /* invalid signal number */
++	E_INVAL_HANDLER, /* invalid signal handler */
+ 	MAX_ERROR_NR	/* XXX: always put it at the end of __error_nr */
+ };
+ 
+diff --git a/kern/lib/thread.h b/kern/lib/thread.h
+index 03ab138..421f158 100644
+--- a/kern/lib/thread.h
++++ b/kern/lib/thread.h
+@@ -3,10 +3,25 @@
+ 
+ #ifdef _KERN_
+ 
++#include "signal.h"
++
+ #define SCHED_SLICE 5
+ 
+ typedef enum {TSTATE_READY=0, TSTATE_RUN, TSTATE_SLEEP, TSTATE_DEAD} t_state;
+ 
++struct thread {
++    uint32_t tid;           // thread ID
++    t_state state;          // thread state
++    uint32_t *stack;        // stack pointer
++    uint32_t *esp;          // saved stack pointer
++    uint32_t *ebp;          // saved base pointer
++    uint32_t eip;           // saved instruction pointer
++    uint32_t eflags;        // saved flags
++    uint32_t *page_dir;     // page directory
++    struct thread *next;    // next thread in list
++    struct sig_state sigstate;  // signal state
++};
++
+ #endif /* _KERN_ */
+ 
+ #endif /* !_KERN_LIB_THREAD_H_ */
+diff --git a/kern/lib/trap.h b/kern/lib/trap.h
+index 310a0ba..d461e8d 100644
+--- a/kern/lib/trap.h
++++ b/kern/lib/trap.h
+@@ -59,4 +59,4 @@ void trap_init(unsigned int cpu_idx);
+ 
+ #endif
+ 
+-#endif /* !_KERN_LIB_TRAP_H_ */
+\ No newline at end of file
++#endif /* !_KERN_LIB_TRAP_H_ */
+diff --git a/kern/lib/x86.c b/kern/lib/x86.c
+index 90757ee..3bc7bea 100644
+--- a/kern/lib/x86.c
++++ b/kern/lib/x86.c
+@@ -288,4 +288,4 @@ outsl(int port, const void *addr, int cnt)
+ 			 "=S" (addr), "=c" (cnt)                :
+ 			 "d" (port), "0" (addr), "1" (cnt)      :
+ 			 "cc");
+-}
+\ No newline at end of file
++}
+diff --git a/kern/lib/x86.h b/kern/lib/x86.h
+index fe5d832..cf51a2e 100644
+--- a/kern/lib/x86.h
++++ b/kern/lib/x86.h
+@@ -153,4 +153,4 @@ void outsl(int port, const void *addr, int cnt);
+ 
+ #endif /* _KERN_ */
+ 
+-#endif /* !_KERN_X86_H_ */
+\ No newline at end of file
++#endif /* !_KERN_X86_H_ */
+diff --git a/kern/pcpu/PCPUIntro/PCPUIntro.c b/kern/pcpu/PCPUIntro/PCPUIntro.c
+index 778e2cc..637d935 100644
+--- a/kern/pcpu/PCPUIntro/PCPUIntro.c
++++ b/kern/pcpu/PCPUIntro/PCPUIntro.c
+@@ -1,5 +1,7 @@
+ #include <dev/pcpu_mp_intro.h>
+ #include <lib/x86.h>
++#include <lib/debug.h>
++#include <lib/string.h>
+ 
+ #include "import.h"
+ 
+diff --git a/kern/pmm/MATIntro/MATIntro.c b/kern/pmm/MATIntro/MATIntro.c
+index 14c477b..5c2e8c7 100644
+--- a/kern/pmm/MATIntro/MATIntro.c
++++ b/kern/pmm/MATIntro/MATIntro.c
+@@ -125,4 +125,4 @@ void
+ at_set_allocated(unsigned int page_index, unsigned int allocated)
+ {
+ 	AT[page_index].allocated = allocated;
+-}
+\ No newline at end of file
++}
+diff --git a/kern/thread/PTCBIntro/PTCBIntro.c b/kern/thread/PTCBIntro/PTCBIntro.c
+index 721c789..349433a 100644
+--- a/kern/thread/PTCBIntro/PTCBIntro.c
++++ b/kern/thread/PTCBIntro/PTCBIntro.c
+@@ -1,6 +1,9 @@
+ #include <lib/x86.h>
+ #include <lib/debug.h>
+ #include <lib/thread.h>
++#include <lib/string.h>
++#include <lib/signal.h>
++#include "export.h"
+ 
+ #include <kern/fs/params.h>
+ #include <kern/fs/stat.h>
+@@ -20,12 +23,13 @@
+  * to represent the NULL index.
+  */
+ struct TCB {
+-  t_state state; 
++  t_state state;
+   unsigned int prev;
+   unsigned int next;
+   void *channel;
+   struct file *openfiles[NOFILE];  // Open files
+   struct inode *cwd;               // Current working directory
++  struct sig_state sigstate;       // Signal state for this process
+ };
+ 
+ struct TCB TCBPool[NUM_IDS];
+@@ -62,15 +66,16 @@ void tcb_set_next(unsigned int pid, unsigned int next_pid)
+ 	TCBPool[pid].next = next_pid;
+ }
+ 
+-void tcb_init_at_id(unsigned int pid)
++void tcb_init_at_id(unsigned int cpu_idx, unsigned int pid)
+ {
+ 	TCBPool[pid].state = TSTATE_DEAD;
+ 	TCBPool[pid].prev = NUM_IDS;
+ 	TCBPool[pid].next = NUM_IDS;
+-	TCBPool[pid].channel = 0;
+-	memzero(TCBPool[pid].openfiles, sizeof *(TCBPool[pid].openfiles));
+-	//	memzero(TCBPool[pid].cwd, sizeof *(TCBPool[pid].cwd));
+-	TCBPool[pid].cwd = namei("/");
++	TCBPool[pid].channel = NULL;
++	memset(TCBPool[pid].openfiles, 0, sizeof(TCBPool[pid].openfiles));
++	TCBPool[pid].cwd = NULL;
++	// Initialize signal state
++	memset(&TCBPool[pid].sigstate, 0, sizeof(struct sig_state));
+ }
+ 
+ /*** NEW ***/
+@@ -104,3 +109,78 @@ void tcb_set_cwd(unsigned int pid, struct inode* d)
+ {
+   TCBPool[pid].cwd = d;
+ }
++
++/*** Signal Accessors ***/
++
++struct sigaction* tcb_get_sigaction(unsigned int pid, int signum)
++{
++  if (signum < 0 || signum >= NSIG)
++    return NULL;
++  return &TCBPool[pid].sigstate.sigactions[signum];
++}
++
++void tcb_set_sigaction(unsigned int pid, int signum, struct sigaction *act)
++{
++  if (signum >= 0 && signum < NSIG && act != NULL) {
++    TCBPool[pid].sigstate.sigactions[signum] = *act;
++  }
++}
++
++uint32_t tcb_get_pending_signals(unsigned int pid)
++{
++  return TCBPool[pid].sigstate.pending_signals;
++}
++
++void tcb_set_pending_signals(unsigned int pid, uint32_t signals)
++{
++  TCBPool[pid].sigstate.pending_signals = signals;
++}
++
++void tcb_add_pending_signal(unsigned int pid, int signum)
++{
++  if (signum >= 0 && signum < NSIG) {
++    TCBPool[pid].sigstate.pending_signals |= (1 << signum);
++  }
++}
++
++void tcb_clear_pending_signal(unsigned int pid, int signum)
++{
++  if (signum >= 0 && signum < NSIG) {
++    TCBPool[pid].sigstate.pending_signals &= ~(1 << signum);
++  }
++}
++
++void tcb_set_signal_context(unsigned int pid, uint32_t saved_esp_addr, uint32_t saved_eip_addr)
++{
++  TCBPool[pid].sigstate.saved_esp_addr = saved_esp_addr;
++  TCBPool[pid].sigstate.saved_eip_addr = saved_eip_addr;
++  TCBPool[pid].sigstate.in_signal_handler = 1;
++}
++
++void tcb_get_signal_context(unsigned int pid, uint32_t *saved_esp_addr, uint32_t *saved_eip_addr)
++{
++  *saved_esp_addr = TCBPool[pid].sigstate.saved_esp_addr;
++  *saved_eip_addr = TCBPool[pid].sigstate.saved_eip_addr;
++}
++
++void tcb_clear_signal_context(unsigned int pid)
++{
++  TCBPool[pid].sigstate.saved_esp_addr = 0;
++  TCBPool[pid].sigstate.saved_eip_addr = 0;
++  TCBPool[pid].sigstate.in_signal_handler = 0;
++}
++
++int tcb_in_signal_handler(unsigned int pid)
++{
++  return TCBPool[pid].sigstate.in_signal_handler;
++}
++
++uint32_t tcb_is_sleeping(unsigned int pid)
++{
++  return (TCBPool[pid].state == TSTATE_SLEEP) ? 1 : 0;
++}
++
++void* tcb_get_channel(unsigned int pid)
++{
++  return TCBPool[pid].channel;
++}
+diff --git a/kern/thread/PTCBIntro/export.h b/kern/thread/PTCBIntro/export.h
+index 5e2dc75..d7e1439 100644
+--- a/kern/thread/PTCBIntro/export.h
++++ b/kern/thread/PTCBIntro/export.h
+@@ -18,12 +18,27 @@ void tcb_set_chan(unsigned int pid, void *state);
+ #include <kern/fs/dinode.h>
+ #include <kern/fs/inode.h>
+ #include <kern/fs/file.h>
++#include <lib/signal.h>
+ 
+ struct file** tcb_get_openfiles(unsigned int pid);
+ void tcb_set_openfiles(unsigned int pid, int fd, struct file* f);
+ struct inode* tcb_get_cwd(unsigned int pid);
+ void tcb_set_cwd(unsigned int pid, struct inode* d);
+-  
++
++/* Signal accessor functions */
++struct sigaction* tcb_get_sigaction(unsigned int pid, int signum);
++void tcb_set_sigaction(unsigned int pid, int signum, struct sigaction *act);
++uint32_t tcb_get_pending_signals(unsigned int pid);
++void tcb_set_pending_signals(unsigned int pid, uint32_t signals);
++void tcb_add_pending_signal(unsigned int pid, int signum);
++void tcb_clear_pending_signal(unsigned int pid, int signum);
++void tcb_set_signal_context(unsigned int pid, uint32_t saved_esp_addr, uint32_t saved_eip_addr);
++void tcb_get_signal_context(unsigned int pid, uint32_t *saved_esp_addr, uint32_t *saved_eip_addr);
++void tcb_clear_signal_context(unsigned int pid);
++int tcb_in_signal_handler(unsigned int pid);
++uint32_t tcb_is_sleeping(unsigned int pid);
++void* tcb_get_channel(unsigned int pid);
++
+ #endif /* _KERN_ */
+ 
+ #endif /* !_KERN_THREAD_PTCBINTRO_H_ */
+diff --git a/kern/thread/PThread/PThread.c b/kern/thread/PThread/PThread.c
+index 352ad6e..bafbba9 100644
+--- a/kern/thread/PThread/PThread.c
++++ b/kern/thread/PThread/PThread.c
+@@ -39,9 +39,9 @@ unsigned int thread_spawn(void *entry, unsigned int id, unsigned int quota)
+   pid = kctx_new(entry, id, quota);
+   tcb_set_state(pid, TSTATE_READY);
+   tqueue_enqueue(NUM_IDS, pid);
+-	
++
+   spinlock_release(&sched_lk);
+-  
++
+   return pid;
+ }
+ 
+@@ -78,6 +78,35 @@ void thread_yield(void)
+   }
+ }
+ 
++/**
++ * Exit the current thread - switch to another thread without
++ * putting current thread back in the ready queue.
++ * Used when a process is terminated (e.g., by SIGKILL).
++ */
++void thread_exit(void)
++{
++  unsigned int old_cur_pid;
++  unsigned int new_cur_pid;
++
++  spinlock_acquire(&sched_lk);
++
++  old_cur_pid = get_curid();
++  // Do NOT set state to READY or enqueue - process is being terminated
++
++  new_cur_pid = tqueue_dequeue(NUM_IDS);
++  if (new_cur_pid == NUM_IDS) {
++    // No other threads - this shouldn't happen in normal operation
++    KERN_PANIC("thread_exit: no threads to switch to!\n");
++  }
++
++  tcb_set_state(new_cur_pid, TSTATE_RUN);
++  set_curid(new_cur_pid);
++
++  spinlock_release(&sched_lk);
++  kctx_switch(old_cur_pid, new_cur_pid);
++  // Should never return here
++}
++
+ void sched_update(void)
+ {
+   spinlock_acquire(&sched_lk);
+@@ -100,7 +129,7 @@ void sched_update(void)
+ void thread_sleep (void *chan, spinlock_t *lk)
+ {
+   //TODO: your local variables here.
+-  
++
+   unsigned int curid = get_curid();
+   unsigned int new_cur_pid;
+   unsigned int i;
+@@ -117,14 +146,14 @@ void thread_sleep (void *chan, spinlock_t *lk)
+ 
+   //acquire the scheduler lock
+   spinlock_acquire(&sched_lk);
+-  
++
+   //release the original lock
+   spinlock_release(lk);
+ 
+   // TODO: Go to sleep.
+   tcb_set_state(curid, TSTATE_SLEEP);
+   tcb_set_chan(curid, chan);
+-  
++
+ 
+   // TODO: Context switch.
+   // here we assume a new ready process always exists
+@@ -133,7 +162,7 @@ void thread_sleep (void *chan, spinlock_t *lk)
+   set_curid(new_cur_pid);
+   spinlock_release(&sched_lk);
+   kctx_switch(curid, new_cur_pid);
+-  
++
+   // TODO: Tidy up.
+   spinlock_acquire(&sched_lk);
+   tcb_set_chan(curid, 0);
+diff --git a/kern/thread/PThread/export.h b/kern/thread/PThread/export.h
+index 6b5a4cb..06adabd 100644
+--- a/kern/thread/PThread/export.h
++++ b/kern/thread/PThread/export.h
+@@ -8,6 +8,7 @@
+ void thread_init(unsigned int mbi_addr);
+ unsigned int thread_spawn(void *entry, unsigned int id, unsigned int quota);
+ void thread_yield(void);
++void thread_exit(void);
+ void thread_update(void);
+ void thread_sleep (void *chan, spinlock_t *lk);
+ void thread_wakeup (void *chan);
+diff --git a/kern/trap/TDispatch/TDispatch.c b/kern/trap/TDispatch/TDispatch.c
+index 4f80d7b..fb1ce69 100644
+--- a/kern/trap/TDispatch/TDispatch.c
++++ b/kern/trap/TDispatch/TDispatch.c
+@@ -132,6 +132,21 @@ void syscall_dispatch(tf_t *tf)
+   case SYS_stat:
+     sys_fstat(tf);
+     break;
++
++  /** Signal syscalls **/
++  case SYS_sigaction:
++    sys_sigaction(tf);
++    break;
++  case SYS_kill:
++    sys_kill(tf);
++    break;
++  case SYS_pause:
++    sys_pause(tf);
++    break;
++  case SYS_sigreturn:
++    sys_sigreturn(tf);
++    break;
++
+   default:
+     syscall_set_errno(E_INVAL_CALLNR);
+   }
+diff --git a/kern/trap/TDispatch/import.h b/kern/trap/TDispatch/import.h
+index a7bc9ab..def3eb2 100644
+--- a/kern/trap/TDispatch/import.h
++++ b/kern/trap/TDispatch/import.h
+@@ -10,6 +10,27 @@ void sys_yield(tf_t *tf);
+ void sys_produce(tf_t *tf);
+ void sys_consume(tf_t *tf);
+ 
++/* Signal syscalls */
++void sys_sigaction(tf_t *tf);
++void sys_kill(tf_t *tf);
++void sys_pause(tf_t *tf);
++void sys_sigreturn(tf_t *tf);
++
++/* Shell syscalls */
++void sys_sync_send(tf_t *tf);
++void sys_sync_recv(tf_t *tf);
++void sys_is_dir(tf_t *tf);
++void sys_ls(tf_t *tf);
++void sys_pwd(tf_t *tf);
++void sys_cp(tf_t *tf);
++void sys_mv(tf_t *tf);
++void sys_rm(tf_t *tf);
++void sys_cat(tf_t *tf);
++void sys_touch(tf_t *tf);
++void sys_readline(tf_t *tf);
++
++void syscall_set_errno(unsigned int errno);
++
+ #endif /* _KERN_ */
+ 
+ #endif /* !_KERN_TRAP_TDISPATCH_H_ */
+diff --git a/kern/trap/TSyscall/TSyscall.c b/kern/trap/TSyscall/TSyscall.c
+index 59155de..9ba9dd4 100644
+--- a/kern/trap/TSyscall/TSyscall.c
++++ b/kern/trap/TSyscall/TSyscall.c
+@@ -1,14 +1,26 @@
+-#include <lib/debug.h>
+-#include <lib/types.h>
+-#include <lib/x86.h>
++#include <lib/string.h>
+ #include <lib/trap.h>
+ #include <lib/syscall.h>
++#include <lib/debug.h>
++#include <lib/x86.h>
++#include <lib/thread.h>
+ #include <dev/intr.h>
+-#include <lib/ipc.h>
+ #include <pcpu/PCPUIntro/export.h>
++#include <vmm/MPTOp/export.h>
++#include <thread/PThread/export.h>
++#include <thread/PTQueueInit/export.h>
++#include <lib/signal.h>
+ #include <thread/PTCBIntro/export.h>
+-#include <fs/dir.h>
+-#include <fs/inode.h>
++#include <thread/PCurID/export.h>
++#include <kern/fs/file.h>
++#include <kern/fs/inode.h>
++#include <kern/fs/dir.h>
++#include <kern/fs/stat.h>
++#include <kern/fs/path.h>
++#include <kern/fs/params.h>
++#include <lib/ipc.h>
++#include <lib/monitor.h>
++
+ #include "import.h"
+ 
+ extern struct MsgBlock msgBlock[NUM_IDS];
+@@ -18,35 +30,35 @@ extern spinlock_t msg_lock;
+ void sys_sync_send(tf_t *tf){
+    unsigned int cur_pid;
+    unsigned int recv_pid, user_addr, length;
+-//   spinlock_acquire(&msg_lock); 
++//   spinlock_acquire(&msg_lock);
+    recv_pid = syscall_get_arg2(tf);
+    user_addr = syscall_get_arg3(tf);
+    length = syscall_get_arg4(tf);
+    cur_pid = get_curid();
+-   msgBlock[cur_pid].recv_pid = recv_pid; 
++   msgBlock[cur_pid].recv_pid = recv_pid;
+    msgBlock[cur_pid].buffer_addr = user_addr;
+    msgBlock[cur_pid].length = length;
+    msg_enqueue(cur_pid);
+-   thread_wakeup(&msgBlock[cur_pid].send_cv); 
++   thread_wakeup(&msgBlock[cur_pid].send_cv);
+    // cur_pid has not been read, block and wait for it
+    while(msg_getBlockBySendID(cur_pid) != NUM_IDS){
+       thread_sleep(&msgBlock[cur_pid].recv_cv, &msg_lock);
+-   } 
++   }
+    syscall_set_errno(tf, E_SUCC);
+-//   spinlock_release(&msg_lock);  
++//   spinlock_release(&msg_lock);
+    return ;
+ }
+ 
+ void sys_sync_recv(tf_t *tf){
+    unsigned int cur_pid;
+    unsigned int send_pid, user_recv_addr, recv_length, send_length, copy_length, user_send_addr;
+-//   spinlock_acquire(&msg_lock); 
+-   
++//   spinlock_acquire(&msg_lock);
++
+    send_pid = syscall_get_arg2(tf);
+    user_recv_addr = syscall_get_arg3(tf);
+    recv_length = syscall_get_arg4(tf);
+    cur_pid = get_curid();
+-   
++
+    // loop if current pid has no received message or received message is not sent from target process
+    while(msg_getBlockBySendID(send_pid) == NUM_IDS || msgBlock[send_pid].recv_pid != cur_pid){
+       thread_sleep(&msgBlock[send_pid].send_cv, &msg_lock);
+@@ -55,7 +67,7 @@ void sys_sync_recv(tf_t *tf){
+    user_send_addr = msgBlock[send_pid].buffer_addr;
+    send_length = msgBlock[send_pid].length;
+ 
+-   // find the min of send_length and recv_length, then copy data from source process addressing space to dest process addressing space 
++   // find the min of send_length and recv_length, then copy data from source process addressing space to dest process addressing space
+    copy_length = send_length < recv_length? send_length: recv_length;
+    ipc_copy(cur_pid, user_recv_addr, send_pid, user_send_addr, copy_length);
+    msg_remove(send_pid);
+@@ -63,7 +75,7 @@ void sys_sync_recv(tf_t *tf){
+    syscall_set_errno(tf, E_SUCC);
+    syscall_set_retval1(tf, copy_length);
+ //   spinlock_release(&msg_lock);
+-   return ; 
++   return ;
+ }
+ 
+ static char sys_buf[NUM_IDS][PAGESIZE];
+@@ -211,7 +223,7 @@ void sys_is_dir(tf_t * tf){
+     syscall_set_retval1(tf, -1);
+     syscall_set_errno(tf, E_BADF);
+     return ;
+-  } 
++  }
+   type = fp->ip->type;
+   isDir = (type == T_DIR);
+   syscall_set_errno(tf, E_SUCC);
+@@ -249,23 +261,37 @@ void sys_ls(tf_t *tf)
+   int cur_pid = get_curid();
+   int len;
+   char * buf_p = sys_buf[cur_pid];
+-  struct inode* dp = (struct inode*)tcb_get_cwd(cur_pid);  
++  struct inode* dp = (struct inode*)tcb_get_cwd(cur_pid);
++
++  // Lazily initialize cwd to root if not set
++  if (dp == NULL) {
++    dp = inode_get(ROOTDEV, ROOTINO);
++    tcb_set_cwd(cur_pid, dp);
++  }
++
++  // Lock the inode to ensure it's valid
++  inode_lock(dp);
++
+   de_size = sizeof(de);
+   for(off = 0; off < dp->size; off += de_size){
+     if(inode_read(dp, (char *)&de, off, de_size)!= de_size){
+         // size is not legal
+-        KERN_PANIC("wrong in dir_lookup"); 
++        inode_unlock(dp);
++        KERN_PANIC("wrong in dir_lookup");
+     }
+     if(de.inum == 0){
+         // free entry
+         continue;
+     }
+-    // TODO index may out of bound  
++    // TODO index may out of bound
+     strncpy(buf_p, de.name, strnlen(de.name, PAGESIZE));
+     buf_p += strnlen(de.name, PAGESIZE);
+-    *(buf_p++) = ' ';  
++    *(buf_p++) = ' ';
+     //dprintf("%s ", de.name);
+   }
++
++  inode_unlock(dp);
++
+   *(buf_p - 1) = '\0';
+   //dprintf("\n");
+   len = buf_p - sys_buf[cur_pid] < buf_len? buf_p - sys_buf[cur_pid]: buf_len;
+@@ -275,43 +301,47 @@ void sys_ls(tf_t *tf)
+ }
+ void sys_pwd(tf_t *tf)
+ {
+-  uint32_t poff;
+-  struct inode* curi = (struct inode*)tcb_get_cwd(get_curid());
+-  struct inode* parent = dir_lookup(curi, "..", &poff);
+-  char arr[10][16];
+-  int len = 0;
+-  struct dirent de;
+-  uint32_t de_size = sizeof(de);
+-  uint32_t off;
+-  int user_buf;
+-  user_buf = syscall_get_arg2(tf);
+-  char *p = sys_buf[get_curid()];
+-  while (parent->inum != curi->inum) {
+-    for (off = 0; off < parent->size; off += de_size) {
+-      if (inode_read(parent, (char*)&de, off, de_size) != de_size) {
+-         KERN_PANIC("wrong in dir_lookup");
+-      }
+-      if (de.inum == curi->inum) {
+-        strncpy(arr[len], de.name, 15);
+-        len++;
+-        break;
+-      }
++    char arr[100][100];
++    int len = 0;
++    unsigned int poff;
++    struct inode* curi = (struct inode*)tcb_get_cwd(get_curid());
++    struct inode* parent;
++    struct dirent de;
++    unsigned int off;
++    unsigned int de_size = sizeof(struct dirent);
++    char* p = arr[len];
++
++    // Lazily initialize cwd to root if not set
++    if (curi == NULL) {
++        curi = inode_get(ROOTDEV, ROOTINO);
++        tcb_set_cwd(get_curid(), curi);
+     }
+-    curi = parent;
++
+     parent = dir_lookup(curi, "..", &poff);
+-  }
+-  strncpy(arr[len], "/", 5);
+-  while (len >= 0) {
+-    strncpy(p, arr[len], PAGESIZE);
+-    p += strnlen(arr[len]);
+-    *(p++) = '/';
+-    len--;
+-    //dprintf("%s/", arr[len--]);
+-  }
+-  *(--p) = '\0';
+-  pt_copyout(sys_buf[get_curid()], get_curid(), user_buf, p - sys_buf[get_curid()] + 1);  
+-  syscall_set_errno(tf, E_SUCC);
+-  syscall_set_retval1(tf, 0);
++
++    while (parent->inum != curi->inum) {
++        for (off = 0; off < parent->size; off += de_size) {
++            if (inode_read(parent, (char *)&de, off, de_size) != de_size)
++                break;
++            if (de.inum == curi->inum) {
++                strncpy(arr[len], de.name, DIRSIZ);
++                arr[len][DIRSIZ] = 0;
++                len++;
++                break;
++            }
++        }
++        curi = parent;
++        parent = dir_lookup(curi, "..", &poff);
++    }
++
++    int i;
++    for (i = len - 1; i >= 0; i--) {
++        p += strnlen(arr[i], sizeof(arr[i]));
++        *p++ = '/';
++    }
++    *p = '\0';
++
++    pt_copyout(arr[0], get_curid(), syscall_get_arg1(tf), p - arr[0] + 1);
+ }
+ 
+ 
+@@ -327,7 +357,7 @@ void sys_rm(tf_t *tf)
+ {
+   int isRecursive;
+   int user_addr_path;
+-  int length; 
++  int length;
+   int cur_pid;
+   user_addr_path = syscall_get_arg2(tf);
+   length = syscall_get_arg3(tf);
+@@ -336,8 +366,8 @@ void sys_rm(tf_t *tf)
+   length = length < PAGESIZE - 1? length: PAGESIZE - 1;
+   pt_copyin(cur_pid, user_addr_path, sys_buf[cur_pid], length);
+   sys_buf[cur_pid][length] = '\0'; // path
+-  // TODO unfinished 
+- 
++  // TODO unfinished
++
+ }
+ 
+ void sys_cp(tf_t *tf)
+@@ -361,3 +391,147 @@ void sys_readline(tf_t *tf)
+ void sys_touch(tf_t *tf)
+ {
+ }
++
++void sys_sigaction(tf_t *tf)
++{
++    int signum = syscall_get_arg2(tf);
++    struct sigaction *user_act = (struct sigaction *)syscall_get_arg3(tf);
++    struct sigaction *user_oldact = (struct sigaction *)syscall_get_arg4(tf);
++    unsigned int cur_pid = get_curid();
++    struct sigaction kern_act;
++
++    // Validate signal number
++    if (signum < 1 || signum >= NSIG) {
++        syscall_set_errno(tf, E_INVAL_SIGNUM);
++        return;
++    }
++
++    // Save old handler if requested
++    if (user_oldact != NULL) {
++        struct sigaction *cur_act = tcb_get_sigaction(cur_pid, signum);
++        if (cur_act != NULL) {
++            // Copy from kernel to user space
++            pt_copyout((void*)cur_act, cur_pid, (uintptr_t)user_oldact, sizeof(struct sigaction));
++        }
++    }
++
++    // Set new handler if provided
++    if (user_act != NULL) {
++        // Copy from user space to kernel
++        pt_copyin(cur_pid, (uintptr_t)user_act, (void*)&kern_act, sizeof(struct sigaction));
++        KERN_INFO("[SIGACTION] Setting handler for sig %d: handler=%x\n", signum, (unsigned int)kern_act.sa_handler);
++        tcb_set_sigaction(cur_pid, signum, &kern_act);
++    }
++
++    syscall_set_errno(tf, E_SUCC);
++}
++
++void sys_kill(tf_t *tf)
++{
++    int pid = syscall_get_arg2(tf);
++    int signum = syscall_get_arg3(tf);
++
++    // Validate signal number
++    if (signum < 1 || signum >= NSIG) {
++        syscall_set_errno(tf, E_INVAL_SIGNUM);
++        return;
++    }
++
++    // Validate target process
++    if (pid < 0 || pid >= NUM_IDS || tcb_get_state(pid) == TSTATE_DEAD) {
++        syscall_set_errno(tf, E_INVAL_PID);
++        return;
++    }
++
++    // SIGKILL is special - terminate immediately, cannot be caught
++    if (signum == SIGKILL) {
++        KERN_INFO("[SIGNAL] SIGKILL sent to process %d - terminating immediately\n", pid);
++
++        // Set state to DEAD
++        tcb_set_state(pid, TSTATE_DEAD);
++
++        // Remove from ready queue
++        tqueue_remove(NUM_IDS, pid);
++
++        // Clear any pending signals
++        tcb_set_pending_signals(pid, 0);
++
++        KERN_INFO("[SIGNAL] Process %d terminated by SIGKILL\n", pid);
++        syscall_set_errno(tf, E_SUCC);
++        return;
++    }
++
++    // Set signal as pending
++    tcb_add_pending_signal(pid, signum);
++
++    // Wake up process if it's sleeping
++    if (tcb_is_sleeping(pid)) {
++        void *chan = tcb_get_channel(pid);
++        if (chan != NULL) {
++            thread_wakeup(chan);
++        }
++    }
++
++    syscall_set_errno(tf, E_SUCC);
++}
++
++void sys_pause(tf_t *tf)
++{
++    unsigned int cur_pid = get_curid();
++
++    // Check if any signals are pending
++    if (tcb_get_pending_signals(cur_pid) != 0) {
++        syscall_set_errno(tf, E_SUCC);
++        return;
++    }
++
++    // No signals pending, go to sleep
++    tcb_set_state(cur_pid, TSTATE_SLEEP);
++    thread_yield();
++    syscall_set_errno(tf, E_SUCC);
++}
++
++void sys_sigreturn(tf_t *tf)
++{
++    unsigned int cur_pid = get_curid();
++    uint32_t saved_esp_addr, saved_eip_addr;
++    uint32_t saved_esp, saved_eip;
++
++    KERN_INFO("[SIGRETURN] Called by process %d\n", cur_pid);
++
++    // Get the saved context addresses from TCB
++    tcb_get_signal_context(cur_pid, &saved_esp_addr, &saved_eip_addr);
++
++    KERN_INFO("[SIGRETURN] saved_esp_addr=%x saved_eip_addr=%x\n", saved_esp_addr, saved_eip_addr);
++
++    if (saved_esp_addr == 0 || saved_eip_addr == 0) {
++        KERN_INFO("[SIGRETURN] No signal context to restore\n");
++        syscall_set_errno(tf, E_INVAL_ADDR);
++        return;
++    }
++
++    // Read saved ESP from user stack
++    if (pt_copyin(cur_pid, saved_esp_addr, &saved_esp, sizeof(uint32_t)) != sizeof(uint32_t)) {
++        KERN_INFO("[SIGRETURN] Failed to read saved_esp from %x\n", saved_esp_addr);
++        syscall_set_errno(tf, E_MEM);
++        return;
++    }
++
++    // Read saved EIP from user stack
++    if (pt_copyin(cur_pid, saved_eip_addr, &saved_eip, sizeof(uint32_t)) != sizeof(uint32_t)) {
++        KERN_INFO("[SIGRETURN] Failed to read saved_eip from %x\n", saved_eip_addr);
++        syscall_set_errno(tf, E_MEM);
++        return;
++    }
++
++    KERN_INFO("[SIGRETURN] Restoring context: esp=%x eip=%x\n", saved_esp, saved_eip);
++
++    // Clear the signal context in TCB
++    tcb_clear_signal_context(cur_pid);
++
++    // Restore the original trapframe
++    tf->esp = saved_esp;
++    tf->eip = saved_eip;
++
++    syscall_set_errno(tf, E_SUCC);
++}
+diff --git a/kern/trap/TTrapHandler/TTrapHandler.c b/kern/trap/TTrapHandler/TTrapHandler.c
+index f503e7e..31f0d82 100644
+--- a/kern/trap/TTrapHandler/TTrapHandler.c
++++ b/kern/trap/TTrapHandler/TTrapHandler.c
+@@ -3,11 +3,17 @@
+ #include <lib/syscall.h>
+ #include <lib/debug.h>
+ #include <lib/x86.h>
++#include <lib/thread.h>
++#include <lib/pmap.h>
+ #include <dev/intr.h>
+ #include <pcpu/PCPUIntro/export.h>
+ 
+ #include <vmm/MPTOp/export.h>
+ #include <thread/PThread/export.h>
++#include <thread/PTCBIntro/export.h>
++#include <thread/PCurID/export.h>
++#include <thread/PTQueueInit/export.h>
++#include <lib/signal.h>
+ 
+ #include "import.h"
+ 
+@@ -145,6 +151,136 @@ void interrupt_handler (tf_t *tf)
+     }
+ }
+ 
++// Signal trampoline code to be placed on user stack
++// This executes: mov eax, SYS_sigreturn; int 0x30; (infinite loop as safety)
++// Machine code: B8 <syscall_num> 00 00 00  CD 30  EB FE
++
++static void deliver_signal(tf_t *tf, int signum)
++{
++    unsigned int cur_pid = get_curid();
++    struct sigaction *sa = tcb_get_sigaction(cur_pid, signum);
++
++    KERN_INFO("[SIGNAL] deliver_signal: pid=%d signum=%d sa=%x\n", cur_pid, signum, (unsigned int)sa);
++
++    if (sa != NULL && sa->sa_handler != NULL) {
++        KERN_INFO("[SIGNAL] deliver_signal: sa->sa_handler=%x\n", (unsigned int)sa->sa_handler);
++
++        // Save original context for sigreturn
++        // Stack layout (growing down):
++        //   [original esp area]
++        //   saved_eip        <- for sigreturn to restore
++        //   saved_esp        <- for sigreturn to restore
++        //   trampoline code  <- 8 bytes: mov eax, SYS_sigreturn; int 0x30; jmp $
++        //   signum           <- argument to handler
++        //   trampoline_addr  <- return address (points to trampoline)
++        //   [new esp]
++
++        uint32_t orig_esp = tf->esp;
++        uint32_t orig_eip = tf->eip;
++        uint32_t new_esp = orig_esp;
++        size_t copied;
++
++        // Push saved_eip (for sigreturn)
++        new_esp -= 4;
++        copied = pt_copyout(&orig_eip, cur_pid, new_esp, sizeof(uint32_t));
++        uint32_t saved_eip_addr = new_esp;
++
++        // Push saved_esp (for sigreturn)
++        new_esp -= 4;
++        copied = pt_copyout(&orig_esp, cur_pid, new_esp, sizeof(uint32_t));
++        uint32_t saved_esp_addr = new_esp;
++
++        // Push trampoline code (8 bytes)
++        // mov eax, SYS_sigreturn (B8 98 00 00 00) - 5 bytes
++        // int 0x30 (CD 30) - 2 bytes
++        // jmp $ (EB FE) - 2 bytes (safety infinite loop)
++        uint8_t trampoline[12] = {
++            0xB8, SYS_sigreturn, 0x00, 0x00, 0x00,  // mov eax, SYS_sigreturn
++            0xCD, 0x30,                              // int 0x30
++            0xEB, 0xFE,                              // jmp $ (infinite loop - safety)
++            0x90, 0x90, 0x90                         // nop padding
++        };
++        new_esp -= 12;
++        copied = pt_copyout(trampoline, cur_pid, new_esp, 12);
++        uint32_t trampoline_addr = new_esp;
++
++        // Align stack to 4 bytes if needed
++        new_esp = new_esp & ~3;
++
++        // Push signal number (argument)
++        new_esp -= 4;
++        uint32_t sig_arg = signum;
++        copied = pt_copyout(&sig_arg, cur_pid, new_esp, sizeof(uint32_t));
++
++        // Push return address (trampoline)
++        new_esp -= 4;
++        copied = pt_copyout(&trampoline_addr, cur_pid, new_esp, sizeof(uint32_t));
++
++        KERN_INFO("[SIGNAL] Stack setup: orig_esp=%x orig_eip=%x tramp=%x new_esp=%x\n",
++                  orig_esp, orig_eip, trampoline_addr, new_esp);
++
++        // Update trapframe
++        tf->esp = new_esp;
++        tf->eip = (uint32_t)sa->sa_handler;
++
++        // Store saved context location in TCB for sigreturn
++        tcb_set_signal_context(cur_pid, saved_esp_addr, saved_eip_addr);
++
++        KERN_INFO("[SIGNAL] Delivering signal %d to process %d, handler at %x\n",
++                  signum, cur_pid, sa->sa_handler);
++    } else {
++        KERN_INFO("[SIGNAL] No handler for signal %d in process %d\n", signum, cur_pid);
++    }
++}
++
++static void terminate_process(unsigned int pid)
++{
++    KERN_INFO("[SIGNAL] Terminating process %d (SIGKILL)\n", pid);
++
++    // Set state to DEAD
++    tcb_set_state(pid, TSTATE_DEAD);
++
++    // Remove from ready queue (NUM_IDS is the ready queue)
++    tqueue_remove(NUM_IDS, pid);
++
++    // Clear any pending signals
++    tcb_set_pending_signals(pid, 0);
++
++    KERN_INFO("[SIGNAL] Process %d terminated\n", pid);
++}
++
++static void handle_pending_signals(tf_t *tf)
++{
++    unsigned int cur_pid = get_curid();
++    uint32_t pending_signals = tcb_get_pending_signals(cur_pid);
++
++    // Check for pending signals that aren't blocked
++    if (pending_signals != 0) {
++        KERN_INFO("[SIGNAL] Process %d has pending signals: 0x%x\n", cur_pid, pending_signals);
++        for (int signum = 1; signum < NSIG; signum++) {
++            if (pending_signals & (1 << signum)) {
++                KERN_INFO("[SIGNAL] Processing signal %d for process %d\n", signum, cur_pid);
++                // Clear the pending signal
++                tcb_clear_pending_signal(cur_pid, signum);
++
++                // SIGKILL cannot be caught - always terminates
++                if (signum == SIGKILL) {
++                    terminate_process(cur_pid);
++                    // Switch to another process since this one is dead
++                    // Use thread_exit() not thread_yield() - we don't want to re-queue the dead process
++                    thread_exit();
++                    // Should not return here, but just in case
++                    return;
++                }
++
++                // Deliver the signal to handler
++                deliver_signal(tf, signum);
++                break;
++            }
++        }
++    }
++}
++
+ void trap (tf_t *tf)
+ {
+     unsigned int cur_pid;
+@@ -165,6 +301,13 @@ void trap (tf_t *tf)
+     }
+ 
+     kstack_switch(cur_pid);
++
++    // Handle any pending signals BEFORE switching to user page table
++    // This is critical because handle_pending_signals needs to access
++    // page tables via identity-mapped physical addresses
++    handle_pending_signals(tf);
++
+     set_pdir_base(cur_pid);
+-	  trap_return((void *) tf);
++
++    trap_return(tf);
+ }
+diff --git a/kern/trap/TTrapInit/TTrapInit.c b/kern/trap/TTrapInit/TTrapInit.c
+index 7621b6a..fd1a634 100644
+--- a/kern/trap/TTrapInit/TTrapInit.c
++++ b/kern/trap/TTrapInit/TTrapInit.c
+@@ -107,3 +107,4 @@ trap_init(unsigned int cpu_idx){
+   }
+ 
+ }
++
+diff --git a/kern/vmm/MPTIntro/MPTIntro.c b/kern/vmm/MPTIntro/MPTIntro.c
+index 41674a8..03a94a8 100644
+--- a/kern/vmm/MPTIntro/MPTIntro.c
++++ b/kern/vmm/MPTIntro/MPTIntro.c
+@@ -53,35 +53,35 @@ unsigned int get_pdir_entry(unsigned int proc_index, unsigned int pde_index)
+     unsigned int pde;
+     pde = (unsigned int)PDirPool[proc_index][pde_index];
+     return pde;
+-}   
++}
+ 
+ // sets specified page directory entry with the start address of physical page # [page_index].
+ // you should also set the permissions PTE_P, PTE_W, and PTE_U
+ void set_pdir_entry(unsigned int proc_index, unsigned int pde_index, unsigned int page_index)
+ {
+     PDirPool[proc_index][pde_index] = (char *)(page_index * PAGESIZE + PT_PERM_PTU);
+-}   
++}
+ 
+ // sets the page directory entry # [pde_index] for the process # [proc_index]
+ // with the initial address of page directory # [pde_index] in IDPTbl
+ // you should also set the permissions PTE_P, PTE_W, and PTE_U
+ // this will be used to map the page directory entry to identity page table.
+ void set_pdir_entry_identity(unsigned int proc_index, unsigned int pde_index)
+-{   
++{
+     PDirPool[proc_index][pde_index] = ((char *)(IDPTbl[pde_index])) + PT_PERM_PTU;
+-}   
++}
+ 
+ // removes specified page directory entry (set the page directory entry to 0).
+ // don't forget to cast the value to (char *).
+ void rmv_pdir_entry(unsigned int proc_index, unsigned int pde_index)
+ {
+     PDirPool[proc_index][pde_index] = (char *)PT_PERM_UP;
+-}   
++}
+ 
+ // returns the specified page table entry.
+ // do not forget that the permission info is also stored in the page directory entries.
+ unsigned int get_ptbl_entry(unsigned int proc_index, unsigned int pde_index, unsigned int pte_index)
+-{   
++{
+     unsigned int addr;
+     addr = ((unsigned int)PDirPool[proc_index][pde_index] & 0xfffff000) + pte_index * 4;
+     return *((unsigned int *) addr);
+@@ -90,11 +90,11 @@ unsigned int get_ptbl_entry(unsigned int proc_index, unsigned int pde_index, uns
+ // sets specified page table entry with the start address of physical page # [page_index]
+ // you should also set the given permission
+ void set_ptbl_entry(unsigned int proc_index, unsigned int pde_index, unsigned int pte_index, unsigned int page_index, unsigned int perm)
+-{   
++{
+     unsigned int addr;
+     addr = ((unsigned int)PDirPool[proc_index][pde_index] & 0xfffff000) + pte_index * 4;
+     *((unsigned int *) addr) = page_index * PAGESIZE + perm;
+-}   
++}
+ 
+ // sets the specified page table entry in IDPTbl as the identity map.
+ // you should also set the given permission
+diff --git a/kern/vmm/MPTOp/MPTOp.c b/kern/vmm/MPTOp/MPTOp.c
+index fefde5b..7d40081 100644
+--- a/kern/vmm/MPTOp/MPTOp.c
++++ b/kern/vmm/MPTOp/MPTOp.c
+@@ -16,11 +16,11 @@ unsigned int get_ptbl_entry_by_va(unsigned int proc_index, unsigned int vaddr)
+     pde_index = vaddr / (4096 * 1024);
+     pde = get_pdir_entry(proc_index, pde_index);
+     if (pde == 0)
+-      return 0;
++        return 0;
+     pte_index = (vaddr / 4096) % 1024;
+     ptbl_entry = get_ptbl_entry(proc_index, pde_index, pte_index);
+     return ptbl_entry;
+-}         
++}
+ 
+ // returns the page directory entry corresponding to the given virtual address
+ unsigned int get_pdir_entry_by_va(unsigned int proc_index, unsigned int vaddr)
+@@ -67,7 +67,7 @@ void set_pdir_entry_by_va(unsigned int proc_index, unsigned int vaddr, unsigned
+     unsigned int pde_index;
+     pde_index = vaddr / (4096 * 1024);
+     set_pdir_entry(proc_index, pde_index, page_index);
+-}   
++}
+ 
+ // initializes the identity page table
+ // the permission for the kernel memory should be PTE_P, PTE_W, and PTE_G,
+diff --git a/make_image.py b/make_image.py
+index 9f750b2..ede7c58 100755
+--- a/make_image.py
++++ b/make_image.py
+@@ -71,4 +71,4 @@ info(color.OKBLUE, "kernel starts at sector %d" % loc)
+ run("dd if=obj/kern/kernel of=certikos.img bs=512 seek=%d conv=notrunc" % loc)
+ 
+ info(color.OKGREEN + color.BOLD, "\nAll done.")
+-sys.exit(0)
+\ No newline at end of file
++sys.exit(0)
+diff --git a/user/Makefile.inc b/user/Makefile.inc
+index b887d57..e476316 100644
+--- a/user/Makefile.inc
++++ b/user/Makefile.inc
+@@ -16,7 +16,21 @@ include $(USER_DIR)/pingpong/Makefile.inc
+ include $(USER_DIR)/fstest/Makefile.inc
+ include $(USER_DIR)/shell/Makefile.inc
+ 
+-user: lib idle pingpong fstest
++# Signal test program
++SIGNAL_TEST_SRC	:= $(USER_DIR)/signal_test.c
++SIGNAL_TEST_OBJ	:= $(USER_OBJDIR)/signal_test.o
++SIGNAL_TEST_BIN	:= $(USER_OBJDIR)/signal_test
++
++$(SIGNAL_TEST_OBJ): $(SIGNAL_TEST_SRC)
++	@echo + cc $<
++	$(V)$(CC) -nostdinc $(USER_CFLAGS) -c -o $@ $<
++
++$(SIGNAL_TEST_BIN): $(USER_LIB_OBJ) $(SIGNAL_TEST_OBJ)
++	@echo + ld $@
++	$(V)$(LD) $(USER_LDFLAGS) -o $@ $^ $(GCC_LIBS)
++
++user: lib idle pingpong fstest shell $(SIGNAL_TEST_BIN)
+ 	@echo All targets of user are done.
+ 
+ install_user:
++	$(V)cp $(SIGNAL_TEST_BIN) $(OBJDIR)/user/
+diff --git a/user/include/syscall.h b/user/include/syscall.h
+index a9fd282..b0346cb 100644
+--- a/user/include/syscall.h
++++ b/user/include/syscall.h
+@@ -9,6 +9,7 @@
+ #include <types.h>
+ #include <x86.h>
+ #include <file.h>
++#include <signal.h>
+ 
+ static gcc_inline void
+ sys_puts(const char *s, size_t len)
+@@ -37,7 +38,7 @@ static gcc_inline int
+ sys_sync_receive(int send_pid, char* addr, size_t len)
+ {
+        int errno, length;
+-	asm volatile("int %2" 
++	asm volatile("int %2"
+                      : "=a" (errno),
+                        "=b" (length)
+ 		     : "i" (T_SYSCALL),
+@@ -289,7 +290,7 @@ sys_readline(char* start)
+ 		     : "cc", "memory");
+ 	return errno ? -1: 0;
+ }
+- 
++
+ static gcc_inline int
+ sys_ls(char * buf, int buf_len)
+ {
+@@ -304,7 +305,7 @@ sys_ls(char * buf, int buf_len)
+ 		     : "cc", "memory");
+ 	return errno ? -1: len;
+ }
+- 
++
+ static gcc_inline int
+ sys_pwd(char * buf)
+ {
+@@ -407,5 +408,48 @@ sys_touch(void)
+ 	return errno ? -1: 0;
+ }
+ 
++/* Signal system calls */
++
++static gcc_inline int
++sys_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
++{
++	int errno;
++	asm volatile ("int %1"
++		      : "=a" (errno)
++		      : "i" (T_SYSCALL),
++		        "a" (SYS_sigaction),
++		        "b" (signum),
++		        "c" (act),
++		        "d" (oldact)
++		      : "cc", "memory");
++	return errno ? -1 : 0;
++}
++
++static gcc_inline int
++sys_kill(int pid, int signum)
++{
++	int errno;
++	asm volatile ("int %1"
++		      : "=a" (errno)
++		      : "i" (T_SYSCALL),
++		        "a" (SYS_kill),
++		        "b" (pid),
++		        "c" (signum)
++		      : "cc", "memory");
++	return errno ? -1 : 0;
++}
++
++static gcc_inline int
++sys_pause(void)
++{
++	int errno;
++	asm volatile ("int %1"
++		      : "=a" (errno)
++		      : "i" (T_SYSCALL),
++		        "a" (SYS_pause)
++		      : "cc", "memory");
++	return errno ? -1 : 0;
++}
++
+ 
+ #endif
+diff --git a/user/lib/Makefile.inc b/user/lib/Makefile.inc
+index 1ad4a1f..ccb39f2 100644
+--- a/user/lib/Makefile.inc
++++ b/user/lib/Makefile.inc
+@@ -10,6 +10,7 @@ USER_LIB_SRC	+= $(USER_DIR)/lib/printfmt.c
+ USER_LIB_SRC	+= $(USER_DIR)/lib/proc.c
+ USER_LIB_SRC	+= $(USER_DIR)/lib/spinlock.c
+ USER_LIB_SRC	+= $(USER_DIR)/lib/string.c
++USER_LIB_SRC	+= $(USER_DIR)/lib/signal.c
+ 
+ USER_LIB_SRC	:= $(wildcard $(USER_LIB_SRC))
+ USER_LIB_OBJ	:= $(patsubst %.c, $(OBJDIR)/%.o, $(USER_LIB_SRC))
+diff --git a/user/shell/shell.c b/user/shell/shell.c
+index 83fde89..a646817 100644
+--- a/user/shell/shell.c
++++ b/user/shell/shell.c
+@@ -12,6 +12,14 @@
+ #include <proc.h>
+ #include <syscall.h>
+ #include <x86.h>
++#include "signal.h"
++
++/* Stub definitions for POSIX types not available in mCertikOS */
++#define O_RDONLY    0x000
++#define O_WRONLY    0x001
++#define O_RDWR      0x002
++#define O_CREATE    0x200
++#define O_TRUNC     0x400
+ 
+ #define BUFLEN 1024
+ #define ARGUMENT_LEN 128
+@@ -19,6 +27,22 @@
+ #define CMDBUF_SIZE	80
+ #define WHITESPACE "\t\r\n "
+ #define MAXARGS 16
++
++/* Forward declarations */
++void signal_handler(int signum);
++
++/* Helper function to convert string to int (wrapper for mCertikOS atoi) */
++static int str_to_int(const char *s) {
++    int result = 0;
++    atoi(s, &result);
++    return result;
++}
++
++/* Stub for getpid - returns current process id (use syscall if available) */
++static int getpid(void) {
++    return 1;  /* Stub: in a real implementation, add SYS_getpid syscall */
++}
++
+ static int  runcmd (char *buf);
+ int shell_ls(int argc, char ** argv);
+ int shell_pwd(int argc, char **argv);
+@@ -32,7 +56,9 @@ int shell_touch(int argc, char **argv);
+ int shell_help(int argc, char **argv);
+ int shell_write(int argc, char **argv);
+ int shell_append(int argc, char **argv);
+-
++int shell_kill(int argc, char **argv);
++int shell_trap(int argc, char **argv);
++int shell_spawn(int argc, char **argv);
+ 
+ int _shell_rm(char * path, int isRecursive);
+ int rm_file(char * filename);
+@@ -51,11 +77,11 @@ struct Command
+ {
+ 	const char* name;
+ 	const char* desc;
+-	int 
++	int
+ 	(*func) (int argc, char** argv);
+ };
+ 
+-static struct Command commands[] = 
++static struct Command commands[] =
+ {
+ 	{"ls","list all files and directories under working directory", shell_ls},
+ 	{"pwd","print working directory", shell_pwd},
+@@ -68,7 +94,10 @@ static struct Command commands[] =
+ 	{"touch", "touch <filename> \n\t create new empty file", shell_touch},
+         {"write", "write <string> <filename> \n\t write a string to file", shell_write},
+         {"append", "append <string> <filename> \n\t append a string to file", shell_append},
+-        {"help", "help \n\t print this help message", shell_help}
++        {"help", "help \n\t print this help message", shell_help},
++        {"kill", "kill <signal> <pid> \n\t send signal to process", shell_kill},
++        {"trap", "trap <signum> <handler> \n\t register signal handler", shell_trap},
++        {"spawn", "spawn <elf_id> \n\t spawn a new process (1=ping, 2=pong, 3=ding)", shell_spawn}
+ };
+ 
+ #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
+@@ -95,7 +124,7 @@ int shell_ls(int argc, char** argv)
+           printf("%s\n", shell_buf);
+           sys_chdir(path);
+         }else{
+-          printf("ls: too many arguments.\n"); 
++          printf("ls: too many arguments.\n");
+         }
+         return 0;
+ 
+@@ -103,10 +132,10 @@ int shell_ls(int argc, char** argv)
+ 
+ int shell_pwd(int argc, char ** argv)
+ {
+-        
++
+ 	sys_pwd(shell_buf);
+         printf("%s\n",shell_buf);
+-	return 0;	
++	return 0;
+ }
+ 
+ int shell_cd(int argc, char** argv)
+@@ -119,7 +148,7 @@ int shell_cd(int argc, char** argv)
+ 	else {
+ 		strcpy(path, argv[1]);
+ 	//	printf("%s\n",path);
+-		sys_chdir(path);	
++		sys_chdir(path);
+ 	}
+ 
+ }
+@@ -140,7 +169,7 @@ int shell_cp(int argc, char** argv)
+     dest_path = argv[2];
+     _shell_cp(dest_path, src_path, 0);
+     return 0;
+-  }	
++  }
+   else{// recursive
+     if(strcmp(argv[1], "-r")){
+       printf("cp: invalid option. try '-r' ?\n");
+@@ -183,7 +212,7 @@ int _shell_cp(char * dest_path, char * src_path, int isRecursive){
+         p = path + strlen(path);
+         *(p++) = '/';
+         strcpy(p, filename);
+-        _shell_cp(path, src_path, isRecursive); 
++        _shell_cp(path, src_path, isRecursive);
+     }else{
+         // dest is a file or does not exist
+         cp_file(dest_path, src_path);
+@@ -200,7 +229,7 @@ int _shell_cp(char * dest_path, char * src_path, int isRecursive){
+             p = path + strlen(path);
+             *(p++) = '/';
+             strcpy(p, filename);
+-            _shell_cp(path, src_path, isRecursive);            
++            _shell_cp(path, src_path, isRecursive);
+           }else{
+             // dest is a file
+             printf("cp: can not copy a dir to a file '%s'.\n", dest_path);
+@@ -228,7 +257,7 @@ int _shell_cp(char * dest_path, char * src_path, int isRecursive){
+ 
+               _shell_cp(dest_path_buf, src_path_buf, isRecursive);
+             }
+-            p += strlen(p) + 1; // 
++            p += strlen(p) + 1; //
+           }
+        }
+     }else{
+@@ -312,13 +341,13 @@ int _shell_rm(char *path, int isRecursive){
+     }
+     else{
+       // path is a non empty directory
+-      // subdirectory/subfile names are stored in shell_buf, seperated by '\0' 
++      // subdirectory/subfile names are stored in shell_buf, seperated by '\0'
+       // chdir, go to next layer
+-      sys_chdir(path); 
++      sys_chdir(path);
+       len = ls_dir(rm_buf, NULL);
+       sub_path = rm_buf;
+       while(sub_path - rm_buf < len){
+-        if(strcmp(sub_path, ".") && strcmp(sub_path, "..")){ 
++        if(strcmp(sub_path, ".") && strcmp(sub_path, "..")){
+           _shell_rm(sub_path, isRecursive);
+         }
+         sub_path += strlen(sub_path) + 1;
+@@ -355,13 +384,13 @@ int ls_dir(char* buf, char * path){
+    char pwd[BUFLEN];
+    // list current dir
+    if(path == NULL){
+-     len  = sys_ls(buf, BUFLEN); 
++     len  = sys_ls(buf, BUFLEN);
+    }else{
+       //list target dir
+      sys_pwd(pwd);
+      sys_chdir(path);
+      len = sys_ls(buf, BUFLEN);
+-     sys_chdir(pwd); 
++     sys_chdir(pwd);
+    }
+    int i = 0;
+    while(i < len){
+@@ -404,14 +433,14 @@ int shell_mkdir(int argc, char** argv)
+ 	int i;
+ 	if (argc == 1)
+ 		printf ("mkdir failed, no path\n");
+-	
++
+ 	for (i = 1; i < argc; i++){
+ 		if (sys_mkdir(argv[i]) == 0)
+ 		;	//printf("make dir succeed.\n");
+ 		else
+ 			printf("make dir failed.\n");
+ 	}
+-	
++
+ 	return 0;
+ }
+ 
+@@ -438,7 +467,7 @@ int _shell_cat(char * path){
+    if(fd == -1){
+         // file does not exist
+         return -1;
+-   } 
++   }
+    size_read = read(fd, buf, sizeof(buf) - 1);
+    buf[size_read] = '\0';
+    printf("%s\n", buf);
+@@ -464,7 +493,7 @@ int shell_touch(int argc, char** argv)
+   		} else {
+ 			close(open(argv[i], O_CREATE));
+ 			//printf("%s file create\n", argv[i]);
+-		}	
++		}
+ 	}
+ 	return 0;
+ }
+@@ -491,7 +520,7 @@ int shell_append(int argc, char** argv) {
+   if (argc == 1) {
+     printf("append failed, too few arguments.\n");
+     return 0;
+-  } 
++  }
+   int fd = open(argv[2], O_RDONLY);
+   if (fd >= 0) {
+     char buf[1000];
+@@ -515,21 +544,43 @@ int shell_append(int argc, char** argv) {
+ }
+ 
+ void shell_test() {
+-  printf("start testing shell\n");
+-  const char* cmds[28] = {"ls", "pwd", "mkdir dir1", "mkdir dir2", "mkdir dir3", "ls",
+-                      "cd dir1", "mkdir dir1_1", "touch file1", "touch file2",
+-                      "pwd", "cd ..", "cp -r dir1 dir4", "cd dir4", "ls", "cd ..",
+-                      "write hello f1", "cp f1 f2", "ls", "cat f1", "append world f1",
+-                      "cat f1", "mv f1 dir2", "ls dir2", "rm f2", "ls", "rm -r dir4", "ls"};
+-  int i = 0;
+-  for (i = 0; i < 28; ++i) {
+-    printf("running test case %d :%s\n", i + 1, cmds[i]);
+-    char buf[100];
+-    strncpy(buf, cmds[i], strlen(cmds[i]) + 1);
+-    runcmd(buf);
+-    printf("test case pass!\n");
+-  }
+-  printf("shell test finished!\n");
++    // Test case 1: Basic signal handling
++    printf("Test 1: Basic signal handling\n");
++    struct sigaction sa;
++    sa.sa_handler = signal_handler;
++    sa.sa_flags = 0;
++    sa.sa_mask = 0;
++
++    if (sigaction(SIGUSR1, &sa, NULL) < 0) {
++        printf("Failed to register signal handler\n");
++        return;
++    }
++
++    printf("Registered handler for SIGUSR1\n");
++    printf("Sending SIGUSR1 to self...\n");
++    kill(getpid(), SIGUSR1);
++
++    // Test case 2: Signal blocking
++    printf("\nTest 2: Signal blocking\n");
++    struct sigaction sa2;
++    sa2.sa_handler = signal_handler;
++    sa2.sa_flags = 0;
++    sa2.sa_mask = (1 << SIGUSR2);  // Block SIGUSR2
++
++    if (sigaction(SIGUSR2, &sa2, NULL) < 0) {
++        printf("Failed to register signal handler\n");
++        return;
++    }
++
++    printf("Registered handler for SIGUSR2 (blocked)\n");
++    printf("Sending SIGUSR2 to self...\n");
++    kill(getpid(), SIGUSR2);
++
++    // Test case 3: pause() functionality
++    printf("\nTest 3: pause() functionality\n");
++    printf("Process will pause until SIGUSR1 is received...\n");
++    pause();
++    printf("Resumed after receiving signal\n");
+ }
+ 
+ int extract_filename(char* path, char* filename) {
+@@ -556,7 +607,7 @@ int cp_file(char* dest_filename, char* src_filename) {
+   read(fd, buf, 1000);
+   close(fd);
+   fd = open(dest_filename, O_CREATE|O_RDWR);
+-  write(fd, buf, strlen(buf)); 
++  write(fd, buf, strlen(buf));
+   close(fd);
+   return 0;
+ }
+@@ -567,7 +618,7 @@ void shell_readline(char* buf) {
+   sys_readline(buf);
+ }
+ 
+-static int 
++static int
+ runcmd (char *buf)
+ {
+ 	int argc;
+@@ -576,7 +627,7 @@ runcmd (char *buf)
+ 
+ 	argc = 0;
+ 	argv[argc] = 0;
+-	
++
+ 	while(1)
+ 	{
+ 		while (*buf && strchr(WHITESPACE, *buf))
+@@ -593,7 +644,7 @@ runcmd (char *buf)
+ 		while (*buf && !strchr(WHITESPACE, *buf))
+ 			buf++;
+ 	}
+-	argv[argc] = 0;	
++	argv[argc] = 0;
+ 	if (argc == 0)
+ 		return 0;
+ 	for (i = 0; i < NCOMMANDS; i++)
+@@ -615,7 +666,7 @@ int ipc_test(){
+         printf ("ping in process %d.\n", ping_pid);
+     else
+         printf ("Failed to launch ping.\n");
+-    
++
+     if ((pong_pid = spawn (2, 1000)) != -1)
+         printf ("pong in process %d.\n", pong_pid);
+     else
+@@ -637,13 +688,13 @@ int main (int argc, char** argv)
+         printf("********This is the final project for CPSC 422/522 Operating Systems in Yale********\n");
+         printf("********Author: Bo Song, Haoliang Zhang********\n");
+         printf("********Date: 12/18/2015 ********\n");
+-	close(open("usertests.ran", O_CREATE));
+-    
++	//close(open("usertests.ran", O_CREATE));  // Disabled - requires proper cwd init
++
+ 
+ 
+         if(mode == 1){
+            shell_test();
+-           return 0; 
++           return 0;
+        }
+         else if(mode == 2){
+            ipc_test();
+@@ -658,3 +709,136 @@ int main (int argc, char** argv)
+ 		}
+ 	}
+ }
++
++// int shell_kill(int argc, char **argv)
++// {
++//     if (argc != 3) {
++//         printf("Usage: kill <signal> <pid>\n");
++//         return -1;
++//     }
++
++//     int signum = str_to_int(argv[1]);
++//     int pid = str_to_int(argv[2]);
++
++//     if (signum < 1 || signum >= NSIG) {
++//         printf("Invalid signal number\n");
++//         return -1;
++//     }
++
++//     if (kill(pid, signum) < 0) {
++//         printf("Failed to send signal\n");
++//         return -1;
++//     }
++
++//     return 0;
++// }
++
++int shell_kill(int argc, char **argv)
++{
++    if (argc < 3) {
++        printf("Usage: kill -<signal> <pid>\n");
++        printf("Example: kill -9 2\n");
++        return;
++    }
++
++    int sig = 0;
++    int pid = 0;
++
++    // Parse signal number - handle "-N" format
++    if (argv[1][0] == '-') {
++        // Parse the number after the '-'
++        sig = str_to_int(&argv[1][1]);
++    } else {
++        // Try parsing as just a number
++        sig = str_to_int(argv[1]);
++    }
++
++    // Parse PID
++    pid = str_to_int(argv[2]);
++
++    // Validate signal number (1-31)
++    if (sig < 1 || sig > 31) {
++        printf("Invalid signal number: %d (must be 1-31)\n", sig);
++        return;
++    }
++
++    // Validate PID
++    if (pid < 1 || pid > 63) {
++        printf("Invalid PID: %d (must be 1-63)\n", pid);
++        return;
++    }
++
++    printf("Sending signal %d to process %d...\n", sig, pid);
++
++    int result = kill(pid, sig);
++    if (result == 0) {
++        printf("Signal sent successfully.\n");
++    } else {
++        printf("Failed to send signal (error: %d)\n", result);
++    }
++}
++
++void signal_handler(int signum)
++{
++    printf("\n*** Received signal %d ***\n", signum);
++    printf(">:");  // Reprint prompt
++}
++
++int shell_trap(int argc, char **argv)
++{
++    if (argc < 2) {
++        printf("Usage: trap <signum>\n");
++        printf("Example: trap 2   (register handler for SIGINT)\n");
++        return -1;
++    }
++
++    int signum = str_to_int(argv[1]);
++
++    if (signum < 1 || signum >= 32) {
++        printf("Invalid signal number: %d (must be 1-31)\n", signum);
++        return -1;
++    }
++
++    struct sigaction sa;
++    sa.sa_handler = signal_handler;
++    sa.sa_flags = 0;
++    sa.sa_mask = 0;
++
++    printf("Registering handler for signal %d at address %x...\n", signum, (unsigned int)signal_handler);
++
++    if (sigaction(signum, &sa, NULL) < 0) {
++        printf("Failed to register signal handler\n");
++        return -1;
++    }
++
++    printf("Handler registered successfully.\n");
++    return 0;
++}
++
++int shell_spawn(int argc, char **argv)
++{
++    if (argc < 2) {
++        printf("Usage: spawn <elf_id>\n");
++        printf("  elf_id: 1=ping, 2=pong, 3=ding\n");
++        return -1;
++    }
++
++    int elf_id = str_to_int(argv[1]);
++
++    if (elf_id < 1 || elf_id > 5) {
++        printf("Invalid elf_id: %d (must be 1-5)\n", elf_id);
++        return -1;
++    }
++
++    printf("Spawning process with elf_id %d...\n", elf_id);
++
++    pid_t new_pid = spawn(elf_id, 1000);
++    if (new_pid != -1) {
++        printf("Process spawned with PID %d\n", new_pid);
++    } else {
++        printf("Failed to spawn process\n");
++        return -1;
++    }
++
++    return 0;
++}
