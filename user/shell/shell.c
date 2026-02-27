@@ -714,11 +714,12 @@ int main (int argc, char** argv)
         }
 	while(1)
 	{
+		buf[0] = '\0';
 		if (shell_readline(buf) < 0) {
 			/* readline was interrupted (e.g., Ctrl+C) */
 			continue;
 		}
-		if (buf != NULL){
+		if (buf[0] != '\0') {
 			if (runcmd (buf) < 0)
 				break;
 		}
