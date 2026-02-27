@@ -66,8 +66,20 @@ void pgflt_handler(tf_t *tf)
 	errno = tf -> err;
 	fault_va = rcr2();
 
-  //Uncomment this line if you need to see the information of the sequence of page faults occured.
 	//KERN_DEBUG("Page fault: VA 0x%08x, errno 0x%08x, process %d, EIP 0x%08x.\n", fault_va, errno, cur_pid, tf -> eip);
+
+	// Check if this is a user-mode fault we can handle via SIGSEGV
+	// User processes have pid > 0; kernel faults (pid 0) still panic
+	if (cur_pid > 0) {
+		if ((errno & PFE_PR) || fault_va < VM_USERLO) {
+			// Protection violation or access below user space (e.g. NULL ptr)
+			// Send SIGSEGV to the faulting process
+			KERN_INFO("[SIGSEGV] Page fault in process %d: va=0x%08x errno=0x%08x eip=0x%08x\n",
+			          cur_pid, fault_va, errno, tf->eip);
+			tcb_add_pending_signal(cur_pid, SIGSEGV);
+			return;
+		}
+	}
 
 	if (errno & PFE_PR) {
 		trap_dump(tf);
@@ -76,7 +88,7 @@ void pgflt_handler(tf_t *tf)
 	}
 
 	if (alloc_page(cur_pid, fault_va, PTE_W | PTE_U | PTE_P) == MagicNumber)
-    KERN_PANIC("Page allocation failed: va = 0x%08x, errno = 0x%08x.\n", fault_va, errno);
+		KERN_PANIC("Page allocation failed: va = 0x%08x, errno = 0x%08x.\n", fault_va, errno);
 
 }
 
@@ -235,13 +247,16 @@ static void deliver_signal(tf_t *tf, int signum)
 
 static void terminate_process(unsigned int pid)
 {
-    KERN_INFO("[SIGNAL] Terminating process %d (SIGKILL)\n", pid);
+    KERN_INFO("[SIGNAL] Terminating process %d\n", pid);
+
+    // Only remove from ready queue if the process is actually queued
+    // A RUNNING process is not in the queue; removing it would corrupt the queue
+    if (tcb_get_state(pid) == TSTATE_READY) {
+        tqueue_remove(NUM_IDS, pid);
+    }
 
     // Set state to DEAD
     tcb_set_state(pid, TSTATE_DEAD);
-
-    // Remove from ready queue (NUM_IDS is the ready queue)
-    tqueue_remove(NUM_IDS, pid);
 
     // Clear any pending signals
     tcb_set_pending_signals(pid, 0);
@@ -266,15 +281,32 @@ static void handle_pending_signals(tf_t *tf)
                 // SIGKILL cannot be caught - always terminates
                 if (signum == SIGKILL) {
                     terminate_process(cur_pid);
-                    // Switch to another process since this one is dead
-                    // Use thread_exit() not thread_yield() - we don't want to re-queue the dead process
                     thread_exit();
-                    // Should not return here, but just in case
                     return;
                 }
 
-                // Deliver the signal to handler
-                deliver_signal(tf, signum);
+                // Check if a user handler is registered
+                struct sigaction *sa = tcb_get_sigaction(cur_pid, signum);
+                if (sa != NULL && sa->sa_handler != NULL) {
+                    // Deliver to user-registered handler
+                    deliver_signal(tf, signum);
+                } else {
+                    // No handler registered — apply default action
+                    // Default for SIGSEGV, SIGTERM, SIGINT, etc. is terminate
+                    const char *sig_name = "Unknown";
+                    if (signum == SIGSEGV) sig_name = "Segmentation fault";
+                    else if (signum == SIGINT) sig_name = "Interrupt";
+                    else if (signum == SIGTERM) sig_name = "Terminated";
+                    else if (signum == SIGABRT) sig_name = "Aborted";
+                    else if (signum == SIGFPE) sig_name = "Floating point exception";
+                    else if (signum == SIGILL) sig_name = "Illegal instruction";
+                    else if (signum == SIGBUS) sig_name = "Bus error";
+
+                    KERN_INFO("\n[Process %d] %s (signal %d)\n", cur_pid, sig_name, signum);
+                    terminate_process(cur_pid);
+                    thread_exit();
+                    return;
+                }
                 break;
             }
         }

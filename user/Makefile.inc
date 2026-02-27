@@ -15,6 +15,7 @@ include $(USER_DIR)/idle/Makefile.inc
 include $(USER_DIR)/pingpong/Makefile.inc
 include $(USER_DIR)/fstest/Makefile.inc
 include $(USER_DIR)/shell/Makefile.inc
+include $(USER_DIR)/sigsegv_test/Makefile.inc
 
 # Signal test program
 SIGNAL_TEST_SRC	:= $(USER_DIR)/signal_test.c
@@ -29,7 +30,7 @@ $(SIGNAL_TEST_BIN): $(USER_LIB_OBJ) $(SIGNAL_TEST_OBJ)
 	@echo + ld $@
 	$(V)$(LD) $(USER_LDFLAGS) -o $@ $^ $(GCC_LIBS)
 
-user: lib idle pingpong fstest shell $(SIGNAL_TEST_BIN)
+user: lib idle pingpong fstest shell sigsegv_test $(SIGNAL_TEST_BIN)
 	@echo All targets of user are done.
 
 install_user:

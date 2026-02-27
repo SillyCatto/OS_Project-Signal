@@ -129,6 +129,7 @@ extern uint8_t _binary___obj_user_pingpong_pong_start[];
 extern uint8_t _binary___obj_user_pingpong_ding_start[];
 extern uint8_t _binary___obj_user_fstest_fstest_start[];
 extern uint8_t _binary___obj_user_shell_shell_start[];
+extern uint8_t _binary___obj_user_sigsegv_test_sigsegv_test_start[];
 /**
  * Spawns a new child process.
  * The user level library function sys_spawn (defined in user/include/syscall.h)
@@ -185,6 +186,8 @@ void sys_spawn(tf_t *tf)
     elf_addr = _binary___obj_user_fstest_fstest_start;
   } else if (elf_id == 5) {
     elf_addr = _binary___obj_user_shell_shell_start;
+  } else if (elf_id == 6) {
+    elf_addr = _binary___obj_user_sigsegv_test_sigsegv_test_start;
   } else {
     syscall_set_errno(tf, E_INVAL_PID);
     syscall_set_retval1(tf, NUM_IDS);
@@ -447,11 +450,13 @@ void sys_kill(tf_t *tf)
     if (signum == SIGKILL) {
         KERN_INFO("[SIGNAL] SIGKILL sent to process %d - terminating immediately\n", pid);
 
+        // Only remove from ready queue if the process is actually queued
+        if (tcb_get_state(pid) == TSTATE_READY) {
+            tqueue_remove(NUM_IDS, pid);
+        }
+
         // Set state to DEAD
         tcb_set_state(pid, TSTATE_DEAD);
-
-        // Remove from ready queue
-        tqueue_remove(NUM_IDS, pid);
 
         // Clear any pending signals
         tcb_set_pending_signals(pid, 0);

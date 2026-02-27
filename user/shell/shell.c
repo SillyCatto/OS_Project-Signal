@@ -59,6 +59,7 @@ int shell_append(int argc, char **argv);
 int shell_kill(int argc, char **argv);
 int shell_trap(int argc, char **argv);
 int shell_spawn(int argc, char **argv);
+int shell_test_signal(int argc, char **argv);
 
 int _shell_rm(char * path, int isRecursive);
 int rm_file(char * filename);
@@ -97,7 +98,8 @@ static struct Command commands[] =
         {"help", "help \n\t print this help message", shell_help},
         {"kill", "kill <signal> <pid> \n\t send signal to process", shell_kill},
         {"trap", "trap <signum> <handler> \n\t register signal handler", shell_trap},
-        {"spawn", "spawn <elf_id> \n\t spawn a new process (1=ping, 2=pong, 3=ding)", shell_spawn}
+        {"spawn", "spawn <elf_id> \n\t spawn a new process (1=ping, 2=pong, 3=ding)", shell_spawn},
+        {"test", "test <test_name> \n\t run signal tests (sigsegv)", shell_test_signal}
 };
 
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
@@ -825,8 +827,8 @@ int shell_spawn(int argc, char **argv)
 
     int elf_id = str_to_int(argv[1]);
 
-    if (elf_id < 1 || elf_id > 5) {
-        printf("Invalid elf_id: %d (must be 1-5)\n", elf_id);
+    if (elf_id < 1 || elf_id > 6) {
+        printf("Invalid elf_id: %d (must be 1-6)\n", elf_id);
         return -1;
     }
 
@@ -841,4 +843,37 @@ int shell_spawn(int argc, char **argv)
     }
 
     return 0;
+}
+
+int shell_test_signal(int argc, char **argv)
+{
+    if (argc < 2) {
+        printf("Usage: test <test_name>\n");
+        printf("Available tests:\n");
+        printf("  sigsegv  - trigger segmentation fault (NULL pointer dereference)\n");
+        return -1;
+    }
+
+    if (strcmp(argv[1], "sigsegv") == 0) {
+        printf("=== SIGSEGV Test ===\n");
+        printf("Spawning process that will dereference a NULL pointer...\n");
+        printf("Expected: process terminates with 'Segmentation fault' instead of kernel panic.\n\n");
+
+        pid_t pid = spawn(6, 1000);  /* elf_id 6 = sigsegv_test */
+        if (pid == -1) {
+            printf("Failed to spawn sigsegv test process\n");
+            return -1;
+        }
+        printf("Test process spawned (PID %d). It should crash gracefully.\n", pid);
+
+        /* Yield CPU to let the spawned process run and fault */
+        sys_yield();
+
+        printf("\n=== OS is still running! Shell is alive. ===\n");
+        return 0;
+    }
+
+    printf("Unknown test: '%s'\n", argv[1]);
+    printf("Available tests: sigsegv\n");
+    return -1;
 }
