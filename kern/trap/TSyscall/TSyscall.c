@@ -130,6 +130,7 @@ extern uint8_t _binary___obj_user_pingpong_ding_start[];
 extern uint8_t _binary___obj_user_fstest_fstest_start[];
 extern uint8_t _binary___obj_user_shell_shell_start[];
 extern uint8_t _binary___obj_user_sigsegv_test_sigsegv_test_start[];
+extern uint8_t _binary___obj_user_sigint_test_sigint_test_start[];
 /**
  * Spawns a new child process.
  * The user level library function sys_spawn (defined in user/include/syscall.h)
@@ -188,6 +189,8 @@ void sys_spawn(tf_t *tf)
     elf_addr = _binary___obj_user_shell_shell_start;
   } else if (elf_id == 6) {
     elf_addr = _binary___obj_user_sigsegv_test_sigsegv_test_start;
+  } else if (elf_id == 7) {
+    elf_addr = _binary___obj_user_sigint_test_sigint_test_start;
   } else {
     syscall_set_errno(tf, E_INVAL_PID);
     syscall_set_retval1(tf, NUM_IDS);

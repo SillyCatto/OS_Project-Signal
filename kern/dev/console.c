@@ -8,6 +8,8 @@
 #include "serial.h"
 #include "keyboard.h"
 
+extern void thread_yield(void);
+
 #define BUFLEN 1024
 static char linebuf[BUFLEN];
 
@@ -85,7 +87,7 @@ getchar(void)
     int c;
 
     while ((c = cons_getc()) == 0)
-        /* do nothing */;
+        thread_yield();  /* yield CPU so other processes can run */
     return c;
 }
 

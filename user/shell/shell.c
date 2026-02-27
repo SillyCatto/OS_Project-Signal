@@ -31,6 +31,9 @@
 /* Forward declarations */
 void sigint_handler(int signum);
 
+/* Foreground child process PID (0 = none) */
+static int foreground_pid = 0;
+
 /* Forward declarations */
 void signal_handler(int signum);
 
@@ -102,7 +105,7 @@ static struct Command commands[] =
         {"kill", "kill <signal> <pid> \n\t send signal to process", shell_kill},
         {"trap", "trap <signum> <handler> \n\t register signal handler", shell_trap},
         {"spawn", "spawn <elf_id> \n\t spawn a new process (1=ping, 2=pong, 3=ding)", shell_spawn},
-        {"test", "test <test_name> \n\t run signal tests (sigsegv)", shell_test_signal}
+        {"test", "test <test_name> \n\t run signal tests (sigsegv, sigint)", shell_test_signal}
 };
 
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
@@ -802,7 +805,13 @@ void signal_handler(int signum)
 
 void sigint_handler(int signum)
 {
-    printf("[SHELL] You pressed Ctrl+C!\n");
+    if (foreground_pid > 0) {
+        printf("\n[SHELL] Ctrl+C: terminating process %d...\n", foreground_pid);
+        kill(foreground_pid, SIGKILL);
+        foreground_pid = 0;
+    } else {
+        printf("[SHELL] You pressed Ctrl+C!\n");
+    }
 }
 
 int shell_trap(int argc, char **argv)
@@ -846,8 +855,8 @@ int shell_spawn(int argc, char **argv)
 
     int elf_id = str_to_int(argv[1]);
 
-    if (elf_id < 1 || elf_id > 6) {
-        printf("Invalid elf_id: %d (must be 1-6)\n", elf_id);
+    if (elf_id < 1 || elf_id > 7) {
+        printf("Invalid elf_id: %d (must be 1-7)\n", elf_id);
         return -1;
     }
 
@@ -870,6 +879,7 @@ int shell_test_signal(int argc, char **argv)
         printf("Usage: test <test_name>\n");
         printf("Available tests:\n");
         printf("  sigsegv  - trigger segmentation fault (NULL pointer dereference)\n");
+        printf("  sigint   - continuous print, terminate with Ctrl+C\n");
         return -1;
     }
 
@@ -892,7 +902,22 @@ int shell_test_signal(int argc, char **argv)
         return 0;
     }
 
+    if (strcmp(argv[1], "sigint") == 0) {
+        printf("=== SIGINT Test ===\n");
+        printf("Spawning process that prints continuously...\n");
+        printf("Press Ctrl+C to terminate it.\n\n");
+
+        pid_t pid = spawn(7, 1000);  /* elf_id 7 = sigint_test */
+        if (pid == -1) {
+            printf("Failed to spawn sigint test process\n");
+            return -1;
+        }
+        printf("Test process spawned (PID %d).\n", pid);
+        foreground_pid = pid;
+        return 0;
+    }
+
     printf("Unknown test: '%s'\n", argv[1]);
-    printf("Available tests: sigsegv\n");
+    printf("Available tests: sigsegv, sigint\n");
     return -1;
 }
