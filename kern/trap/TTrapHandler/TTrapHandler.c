@@ -72,8 +72,6 @@ void pgflt_handler(tf_t *tf)
 	// User processes have pid > 0; kernel faults (pid 0) still panic
 	if (cur_pid > 0) {
 		if ((errno & PFE_PR) || fault_va < VM_USERLO) {
-			// Protection violation or access below user space (e.g. NULL ptr)
-			// Send SIGSEGV to the faulting process
 			KERN_INFO("[SIGSEGV] Page fault in process %d: va=0x%08x errno=0x%08x eip=0x%08x\n",
 			          cur_pid, fault_va, errno, tf->eip);
 			tcb_add_pending_signal(cur_pid, SIGSEGV);

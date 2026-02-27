@@ -29,6 +29,9 @@
 #define MAXARGS 16
 
 /* Forward declarations */
+void sigint_handler(int signum);
+
+/* Forward declarations */
 void signal_handler(int signum);
 
 /* Helper function to convert string to int (wrapper for mCertikOS atoi) */
@@ -616,8 +619,8 @@ int cp_file(char* dest_filename, char* src_filename) {
 
 
 
-void shell_readline(char* buf) {
-  sys_readline(buf);
+int shell_readline(char* buf) {
+  return sys_readline(buf);
 }
 
 static int
@@ -692,7 +695,14 @@ int main (int argc, char** argv)
         printf("********Date: 12/18/2015 ********\n");
 	//close(open("usertests.ran", O_CREATE));  // Disabled - requires proper cwd init
 
-
+        // Register SIGINT handler for Ctrl+C
+        {
+            struct sigaction sa;
+            sa.sa_handler = sigint_handler;
+            sa.sa_flags = 0;
+            sa.sa_mask = 0;
+            sigaction(SIGINT, &sa, 0);
+        }
 
         if(mode == 1){
            shell_test();
@@ -704,7 +714,10 @@ int main (int argc, char** argv)
         }
 	while(1)
 	{
-		shell_readline(buf);
+		if (shell_readline(buf) < 0) {
+			/* readline was interrupted (e.g., Ctrl+C) */
+			continue;
+		}
 		if (buf != NULL){
 			if (runcmd (buf) < 0)
 				break;
@@ -784,6 +797,11 @@ void signal_handler(int signum)
 {
     printf("\n*** Received signal %d ***\n", signum);
     printf(">:");  // Reprint prompt
+}
+
+void sigint_handler(int signum)
+{
+    printf("[SHELL] You pressed Ctrl+C!\n");
 }
 
 int shell_trap(int argc, char **argv)

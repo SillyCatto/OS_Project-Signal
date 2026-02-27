@@ -380,6 +380,21 @@ void sys_cp(tf_t *tf)
 void sys_readline(tf_t *tf)
 {
   char* kernbuf = (char*)readline(">:");
+
+  /* readline returns NULL when interrupted by Ctrl+C */
+  if (kernbuf == NULL) {
+    /* Send SIGINT to the calling process */
+    unsigned int cur_pid = get_curid();
+    tcb_add_pending_signal(cur_pid, SIGINT);
+    syscall_set_errno(tf, E_INVAL_EVENT);
+    syscall_set_retval1(tf, -1);
+    /* Copy an empty string so the user buffer is valid */
+    char* userbuf = (char*)syscall_get_arg2(tf);
+    char empty = '\0';
+    pt_copyout((void*)&empty, cur_pid, userbuf, 1);
+    return;
+  }
+
   char* userbuf = (char*)syscall_get_arg2(tf);
   int n_len = strnlen(kernbuf, 1000) + 1;
 

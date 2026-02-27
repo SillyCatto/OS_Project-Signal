@@ -110,6 +110,12 @@ readline(const char *prompt)
     if (c < 0) {
       dprintf("read error: %e\n", c);
       return NULL;
+    } else if (c == 0x03) {
+      /* Ctrl+C pressed: print ^C, return NULL to signal interruption */
+      putchar('^');
+      putchar('C');
+      putchar('\n');
+      return NULL;
     } else if ((c == '\b' || c == '\x7f') && i > 0) {
       putchar('\b');
       i--;
