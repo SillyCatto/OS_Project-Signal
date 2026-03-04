@@ -25,7 +25,6 @@
     - [8. Test Process: sigint\_test](#8-test-process-sigint_test)
     - [9. Build System Integration](#9-build-system-integration)
     - [10. Shell Command: test sigint](#10-shell-command-test-sigint)
-  - [How It Works: End-to-End Flow](#how-it-works-end-to-end-flow)
   - [The Cooperative Scheduling Problem: Why thread\_yield() Was Essential](#the-cooperative-scheduling-problem-why-thread_yield-was-essential)
     - [The Problem](#the-problem)
     - [The Solution](#the-solution)
@@ -76,7 +75,7 @@ This document details every component involved in implementing Ctrl+C to termina
 3. **Shell remains alive** after child is terminated — returns to the prompt
 4. **No foreground process** → Ctrl+C simply prints a notification and continues
 5. **Reuse existing signal infrastructure** — `tcb_add_pending_signal`, `deliver_signal`, trampoline, `sigreturn`
-6. **Child process uses no signal handlers** — it's killed externally by the shell via SIGKILL
+6. **Child process uses no signal handlers** — it's killed externally by the shell via SIGKILL (but _can_ register handlers — see `test sigint-custom` in [test_sigint_custom.md](test_sigint_custom.md))
 
 ---
 
@@ -344,7 +343,7 @@ flowchart TD
     I -- Yes --> J["deliver_signal(tf, SIGINT):<br/>rewrite trapframe"]
     J --> K["Shell's sigint_handler() runs"]
     K --> L{"foreground_pid > 0?"}
-    L -- Yes --> M["kill(foreground_pid, SIGKILL)<br/>→ child terminated"]
+    L -- Yes --> M["kill(foreground_pid, foreground_signal)<br/>→ child terminated (SIGKILL) or caught (SIGINT)"]
     L -- No --> N["Print: You pressed Ctrl+C!"]
     M --> O["sigreturn → restore shell context<br/>→ back to readline → prompt"]
     N --> O
@@ -362,12 +361,18 @@ flowchart TD
 
 **File**: `user/shell/shell.c`
 
-A simple global variable tracks which child process is currently "in the foreground":
+Two global variables track the foreground child and which signal to send on Ctrl+C:
 
 ```c
 /* Foreground child process PID (0 = none) */
 static int foreground_pid = 0;
+static int foreground_signal = SIGKILL;  /* default signal to send on Ctrl+C */
 ```
+
+**Why two variables?**
+
+- `foreground_pid` tracks _which_ child to signal.
+- `foreground_signal` tracks _what_ signal to send. For the basic `test sigint`, this is SIGKILL (uncatchable — immediate death). For `test sigint-custom`, this is SIGINT (catchable — child's handler runs instead). See [test_sigint_custom.md](test_sigint_custom.md) for the catchable signal demo.
 
 **Lifecycle:**
 
@@ -375,18 +380,21 @@ static int foreground_pid = 0;
    ```c
    pid_t pid = spawn(7, 1000);  // Create child
    foreground_pid = pid;         // Track it as foreground
+   foreground_signal = SIGKILL;  // Force kill — child has no handler
    ```
 
-2. **Cleared** when the SIGINT handler terminates the child:
+2. **Used** when the SIGINT handler fires:
    ```c
-   kill(foreground_pid, SIGKILL);  // Kill the child
-   foreground_pid = 0;             // No more foreground process
+   kill(foreground_pid, foreground_signal);  // Send configured signal
+   if (foreground_signal == SIGKILL)
+       foreground_pid = 0;   // SIGKILL guarantees death
+   // For catchable signals, keep foreground_pid — child may survive
    ```
 
 3. **Checked** in the SIGINT handler to decide what to do:
    ```c
    if (foreground_pid > 0) {
-       // Kill the foreground child
+       // Signal the foreground child
    } else {
        // Print message — no child to kill
    }
@@ -450,22 +458,38 @@ After registration, whenever SIGINT is pending for this process, `handle_pending
 void sigint_handler(int signum)
 {
     if (foreground_pid > 0) {
-        printf("\n[SHELL] Ctrl+C: terminating process %d...\n", foreground_pid);
-        kill(foreground_pid, SIGKILL);  // Send SIGKILL to child
-        foreground_pid = 0;             // Clear tracking
+        printf("\n[SHELL] Ctrl+C: sending signal %d to process %d...\n",
+               foreground_signal, foreground_pid);
+        kill(foreground_pid, foreground_signal);
+        if (foreground_signal == SIGKILL) {
+            foreground_pid = 0;  /* SIGKILL guarantees death */
+        }
+        /* For catchable signals (SIGINT), keep foreground_pid set —
+         * the child may survive if it has a handler */
     } else {
         printf("[SHELL] You pressed Ctrl+C!\n");
     }
 }
 ```
 
-**Why SIGKILL (9) instead of SIGINT (2) to kill the child?**
+**Why `foreground_signal` instead of always using SIGKILL?**
+
+- For `test sigint`, where the child has no handler, `foreground_signal = SIGKILL` — the original behavior.
+- For `test sigint-custom`, where the child registers a custom SIGINT handler, `foreground_signal = SIGINT` — the child catches it and survives. See [test_sigint_custom.md](test_sigint_custom.md).
+- This variable makes the shell flexible: the same `sigint_handler()` function handles both catchable and uncatchable scenarios.
+
+**Why SIGKILL (9) is used for `test sigint`:**
 
 - The test process (`sigint_test`) doesn't register any signal handlers
 - If we sent SIGINT to it, the default action would terminate it — but only when the kernel checks pending signals at the next `trap()` return, which requires the child to be **scheduled and run first**
 - SIGKILL is **uncatchable** — `handle_pending_signals()` doesn't even check for a handler, it goes straight to `terminate_process()` + `thread_exit()`
 - SIGKILL is also what real shells use for forceful termination (`kill -9`)
 - Using SIGKILL ensures the child dies immediately when it's next scheduled, regardless of any handler it might register
+
+**Why `foreground_pid` is only cleared for SIGKILL:**
+
+- SIGKILL is uncatchable — the child is guaranteed dead, so we can safely reset `foreground_pid = 0`.
+- For SIGINT, the child _might_ have a handler (as in `test sigint-custom`). If we cleared `foreground_pid`, the shell would lose track and couldn't send subsequent Ctrl+C signals to the same child. So we keep it set.
 
 **What `kill()` does:**
 
@@ -805,9 +829,13 @@ if (strcmp(argv[1], "sigint") == 0) {
         return -1;
     }
     printf("Test process spawned (PID %d).\n", pid);
-    foreground_pid = pid;    // ← Track as foreground process
-    return 0;                // Return to main loop → readline
+    foreground_pid = pid;         // ← Track as foreground process
+    foreground_signal = SIGKILL;  // ← No handler — force kill
+    return 0;                     // Return to main loop → readline
 }
+```
+
+> **Note:** A companion command `test sigint-custom` spawns a child that _catches_ SIGINT with a custom handler, using `foreground_signal = SIGINT` instead. See [test_sigint_custom.md](test_sigint_custom.md) for the full walkthrough.
 ```
 
 **Why does `test sigint` return immediately (not wait for the child)?**
@@ -828,7 +856,7 @@ When the user presses Ctrl+C:
 7. Shell's `getchar()` → `cons_getc()` → returns 0x03
 8. `readline()` detects 0x03 → returns NULL
 9. `sys_readline()` adds SIGINT → `handle_pending_signals()` → `deliver_signal()`
-10. Shell's `sigint_handler()` runs → `kill(child, SIGKILL)` → child dies
+10. Shell's `sigint_handler()` runs → `kill(child, foreground_signal)` → child dies (SIGKILL for `test sigint`)
 11. `sigreturn` → shell back at prompt
 
 ---
@@ -846,7 +874,7 @@ sequenceDiagram
     Shell->>Kernel: spawn(7, 1000)
     Kernel->>Child: proc_create(): parse ELF,<br/>setup page tables, PID 7
     Kernel-->>Shell: returns PID 7
-    Shell->>Shell: foreground_pid = 7
+    Shell->>Shell: foreground_pid = 7<br/>foreground_signal = SIGKILL
     Shell->>Kernel: sys_readline(buf) → readline(">:")
 
     loop Timesharing (cooperative + timer)
@@ -877,10 +905,10 @@ sequenceDiagram
 
     Kernel->>Shell: trap_return(tf) →<br/>sigint_handler(2) executes
     Shell->>Shell: foreground_pid(7) > 0? YES
-    Shell->>Kernel: kill(7, SIGKILL)
+    Shell->>Kernel: kill(7, foreground_signal=SIGKILL)
     Kernel->>Kernel: sys_kill: SIGKILL fast path<br/>state(7)==READY → tqueue_remove<br/>set TSTATE_DEAD, clear signals
     Kernel-->>Shell: kill returns 0
-    Shell->>Shell: foreground_pid = 0
+    Shell->>Shell: foreground_signal==SIGKILL<br/>→ foreground_pid = 0
     Shell->>Shell: sigint_handler() returns (ret)
     Shell->>Shell: CPU pops return addr →<br/>jumps to trampoline
     Shell->>Kernel: Trampoline: mov eax, 152<br/>int 0x30 → sys_sigreturn
@@ -1097,12 +1125,14 @@ A fuller `sigreturn` implementation (like Linux's) would save and restore ALL re
 | File | Action | Purpose |
 |------|--------|---------|
 | `kern/dev/console.c` | Modified | Added `extern void thread_yield(void)`, `thread_yield()` in `getchar()` loop, Ctrl+C (0x03) detection in `readline()` returning NULL |
-| `kern/trap/TSyscall/TSyscall.c` | Modified | `sys_readline()` detects NULL → dispatches SIGINT; `sys_kill()` SIGKILL fast path; `elf_id == 7` for sigint_test |
+| `kern/trap/TSyscall/TSyscall.c` | Modified | `sys_readline()` detects NULL → dispatches SIGINT; `sys_kill()` SIGKILL fast path; `elf_id == 7` for sigint_test, `elf_id == 8` for sigint_custom_test |
 | `kern/trap/TTrapHandler/TTrapHandler.c` | Reused | `handle_pending_signals()` → `deliver_signal()` for SIGINT with user handler |
-| `user/shell/shell.c` | Modified | Added `foreground_pid` tracking, `sigint_handler()`, SIGINT registration in `main()`, `buf[0] = '\0'` safety clear, `test sigint` command |
+| `user/shell/shell.c` | Modified | Added `foreground_pid` + `foreground_signal` tracking, `sigint_handler()` uses configurable signal, SIGINT registration in `main()`, `buf[0] = '\0'` safety clear, `test sigint` and `test sigint-custom` commands |
 | `user/sigint_test/sigint_test.c` | Created | Infinite loop printing "Hello World!" |
 | `user/sigint_test/Makefile.inc` | Created | Build rules, adds to `KERN_BINFILES` |
-| `user/Makefile.inc` | Modified | Include sigint_test in build and user target |
+| `user/sigint_custom_test/sigint_custom_test.c` | Created | Catches SIGINT with custom handler — prints "YOU CAN'T KILL ME!!" |
+| `user/sigint_custom_test/Makefile.inc` | Created | Build rules, adds to `KERN_BINFILES` |
+| `user/Makefile.inc` | Modified | Include sigint_test and sigint_custom_test in build and user target |
 
 ---
 
@@ -1178,7 +1208,7 @@ Test process spawned (PID 7).
 [sigint_test] Hello World! (143)
 ^C
 
-[SHELL] Ctrl+C: terminating process 7...
+[SHELL] Ctrl+C: sending signal 9 to process 7...
 [SIGNAL] SIGKILL sent to process 7 - terminating immediately
 [SIGNAL] Process 7 terminated by SIGKILL
 >:
@@ -1215,4 +1245,6 @@ Test process spawned (PID 7).
 | `SCHED_SLICE` | 5 | `kern/lib/thread.h` | Scheduling quantum in milliseconds |
 | `NUM_IDS` | 64 | (config) | Max processes; queue-empty sentinel |
 | `elf_id` | 7 | `TSyscall.c` | ELF identifier for sigint_test binary |
+| `elf_id` | 8 | `TSyscall.c` | ELF identifier for sigint_custom_test binary |
 | `foreground_pid` | variable | `user/shell/shell.c` | Tracks current foreground child PID |
+| `foreground_signal` | variable | `user/shell/shell.c` | Signal to send on Ctrl+C (SIGKILL or SIGINT) |

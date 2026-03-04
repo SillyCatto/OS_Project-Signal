@@ -98,7 +98,7 @@ When a foreground process (like `sigint_test` printing infinitely) is running an
 │  Layer 7   trap() → handle_pending_signals() → deliver_signal(tf, 2)         │
 │      ↓                                                                       │
 │  Layer 8   Shell's sigint_handler(2) runs in user mode                       │
-│            → kill(foreground_pid, SIGKILL) → child dies                      │
+│            → kill(foreground_pid, foreground_signal) → child dies or catches   │
 │      ↓                                                                       │
 │  Layer 9   Handler returns → trampoline → sigreturn                          │
 │            → restore ESP/EIP → shell back at readline → ">:" prompt          │
@@ -795,18 +795,28 @@ When the CPU enters `sigint_handler()`, it's running in user mode (ring 3) with:
 void sigint_handler(int signum)
 {
     if (foreground_pid > 0) {
-        printf("\n[SHELL] Ctrl+C: terminating process %d...\n", foreground_pid);
-        kill(foreground_pid, SIGKILL);  // Send SIGKILL to child
-        foreground_pid = 0;             // Clear tracking
+        printf("\n[SHELL] Ctrl+C: sending signal %d to process %d...\n",
+               foreground_signal, foreground_pid);
+        kill(foreground_pid, foreground_signal);
+        if (foreground_signal == SIGKILL) {
+            foreground_pid = 0;  /* SIGKILL guarantees death */
+        }
+        /* For catchable signals (SIGINT), keep foreground_pid set —
+         * the child may survive if it has a handler */
     } else {
         printf("[SHELL] You pressed Ctrl+C!\n");
     }
 }
 ```
 
-### What `kill(foreground_pid, SIGKILL)` Does
+### What `kill(foreground_pid, foreground_signal)` Does
 
-The `kill()` library function triggers syscall `SYS_kill` with arguments `(pid, SIGKILL)`.
+The `kill()` library function triggers syscall `SYS_kill` with arguments `(pid, foreground_signal)`.
+
+The signal sent depends on `foreground_signal`:
+
+- **SIGKILL (9)** — used by `test sigint` (child has no handler). The kernel takes the SIGKILL fast path: immediate `TSTATE_DEAD` + queue removal. Child is guaranteed dead.
+- **SIGINT (2)** — used by `test sigint-custom` (child has a custom handler). The kernel marks SIGINT as pending via `tcb_add_pending_signal()`. When the child is next scheduled and traps, `deliver_signal()` redirects it to the child's own handler. See [test_sigint_custom.md](test_sigint_custom.md) for the full walkthrough.
 
 In the kernel (`sys_kill` in TSyscall.c), SIGKILL has a **fast path**:
 
@@ -837,8 +847,9 @@ void sys_kill(tf_t *tf)
 - Effectively, the child ceases to exist
 
 The handler then:
-1. Sets `foreground_pid = 0` — no more foreground process
-2. Returns via the C `ret` instruction → popping the return address from the stack
+1. Checks `foreground_signal == SIGKILL`: if so, sets `foreground_pid = 0` — child is guaranteed dead
+2. If `foreground_signal == SIGINT`: keeps `foreground_pid` set — child may survive if it has a handler
+3. Returns via the C `ret` instruction → popping the return address from the stack
 
 ---
 
@@ -1104,19 +1115,27 @@ The maximum latency from key press to detection is approximately:
 
 ```c
 /* In user/shell/shell.c */
-static int foreground_pid = 0;  // 0 = no foreground process
+static int foreground_pid = 0;        // 0 = no foreground process
+static int foreground_signal = SIGKILL; // default signal to send on Ctrl+C
 ```
 
 **Lifecycle:**
 
 ```
-1. Shell starts:           foreground_pid = 0
-2. "test sigint" command:  pid = spawn(7, 1000)
-                           foreground_pid = pid  (e.g., 7)
-3. Ctrl+C handler:        kill(foreground_pid, SIGKILL)
-                           foreground_pid = 0
-4. Back to prompt:        foreground_pid = 0
+1. Shell starts:            foreground_pid = 0, foreground_signal = SIGKILL
+2. "test sigint" command:   pid = spawn(7, 1000)
+                            foreground_pid = pid  (e.g., 7)
+                            foreground_signal = SIGKILL
+3. "test sigint-custom":    pid = spawn(8, 1000)
+                            foreground_pid = pid  (e.g., 7)
+                            foreground_signal = SIGINT  (catchable!)
+4. Ctrl+C handler:          kill(foreground_pid, foreground_signal)
+                            if (SIGKILL) foreground_pid = 0
+                            if (SIGINT)  foreground_pid stays set
+5. Back to prompt:          foreground_pid = 0 (eventually)
 ```
+
+> For the full walkthrough of `test sigint-custom` (where the child catches SIGINT), see [test_sigint_custom.md](test_sigint_custom.md).
 
 ### Comparison with Real UNIX Job Control
 
@@ -1135,9 +1154,10 @@ UNIX Model (simplified):
 CertiKOS Model:
 ┌──────────────────────────────────────────────────────────────┐
 │                     Shell Process                            │
-│  - Tracks single foreground_pid variable                     │
+│  - Tracks foreground_pid + foreground_signal variables        │
 │  - Detects Ctrl+C via readline NULL return                   │
-│  - Sends SIGKILL to ONE foreground process                   │
+│  - Sends foreground_signal to ONE foreground process         │
+│  - SIGKILL (test sigint) or SIGINT (test sigint-custom)      │
 │  - No bg/fg/jobs/& — single foreground only                  │
 │  - No process groups or sessions                             │
 └──────────────────────────────────────────────────────────────┘
@@ -1398,6 +1418,8 @@ Despite the simplifications, these fundamental concepts are faithfully implement
 |------|-------|---------|
 | `user/sigint_test/sigint_test.c` | ~15 | Infinite "Hello World!" printing loop |
 | `user/sigint_test/Makefile.inc` | ~15 | Build rules for sigint_test binary |
+| `user/sigint_custom_test/sigint_custom_test.c` | ~33 | Catches SIGINT with custom handler — prints "YOU CAN'T KILL ME!!" |
+| `user/sigint_custom_test/Makefile.inc` | ~28 | Build rules for sigint_custom_test binary |
 
 ### Files Modified
 
@@ -1407,13 +1429,13 @@ Despite the simplifications, these fundamental concepts are faithfully implement
 | `kern/dev/console.c` | `readline()` | Added `c == 0x03` check → print `^C\n`, return NULL |
 | `kern/trap/TSyscall/TSyscall.c` | `sys_readline()` | Added NULL check → `tcb_add_pending_signal(SIGINT)`, error return, empty string copy |
 | `kern/trap/TSyscall/TSyscall.c` | `sys_kill()` | Added SIGKILL fast path with `TSTATE_READY` guard |
-| `kern/trap/TSyscall/TSyscall.c` | `sys_spawn()` | Added `elf_id == 7` → `sigint_test` mapping |
+| `kern/trap/TSyscall/TSyscall.c` | `sys_spawn()` | Added `elf_id == 7` → `sigint_test` mapping, `elf_id == 8` → `sigint_custom_test` mapping |
 | `kern/trap/TTrapHandler/TTrapHandler.c` | `handle_pending_signals()` | Existing — processes SIGINT (calls `deliver_signal` when handler registered) |
 | `kern/trap/TTrapHandler/TTrapHandler.c` | `terminate_process()` | Added `TSTATE_READY` guard before `tqueue_remove()` |
-| `user/shell/shell.c` | globals | Added `foreground_pid` variable |
-| `user/shell/shell.c` | `sigint_handler()` | Created — kills foreground child via SIGKILL |
+| `user/shell/shell.c` | globals | Added `foreground_pid` and `foreground_signal` variables |
+| `user/shell/shell.c` | `sigint_handler()` | Created — sends `foreground_signal` to foreground child (SIGKILL or SIGINT) |
 | `user/shell/shell.c` | `main()` | Added `sigaction(SIGINT, ...)` registration, `buf[0]='\0'` clear, `buf[0]!='\0'` guard |
-| `user/shell/shell.c` | `shell_test_signal()` | Added `test sigint` command — spawns child, sets `foreground_pid` |
+| `user/shell/shell.c` | `shell_test_signal()` | Added `test sigint` command (spawns child, sets `foreground_pid`, `foreground_signal = SIGKILL`) and `test sigint-custom` command (spawns child with custom handler, `foreground_signal = SIGINT`) |
 | `user/Makefile.inc` | | Added sigint_test include and target |
 
 ### Files Referenced (Not Modified)
@@ -1462,4 +1484,6 @@ Despite the simplifications, these fundamental concepts are faithfully implement
 | `E_SUCC` | 0 | `kern/lib/syscall.h` | Success error code |
 | `E_INVAL_EVENT` | — | `kern/lib/syscall.h` | Error: invalid/interrupted event |
 | `foreground_pid` | variable | `user/shell/shell.c` | Tracks current foreground child PID |
+| `foreground_signal` | variable | `user/shell/shell.c` | Signal to send on Ctrl+C (SIGKILL or SIGINT) |
 | `elf_id 7` | — | `TSyscall.c` | Identifier for sigint_test binary |
+| `elf_id 8` | — | `TSyscall.c` | Identifier for sigint_custom_test binary |

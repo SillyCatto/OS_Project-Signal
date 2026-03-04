@@ -33,6 +33,7 @@ void sigint_handler(int signum);
 
 /* Foreground child process PID (0 = none) */
 static int foreground_pid = 0;
+static int foreground_signal = SIGKILL;  /* default signal to send on Ctrl+C */
 
 /* Forward declarations */
 void signal_handler(int signum);
@@ -806,9 +807,14 @@ void signal_handler(int signum)
 void sigint_handler(int signum)
 {
     if (foreground_pid > 0) {
-        printf("\n[SHELL] Ctrl+C: terminating process %d...\n", foreground_pid);
-        kill(foreground_pid, SIGKILL);
-        foreground_pid = 0;
+        printf("\n[SHELL] Ctrl+C: sending signal %d to process %d...\n",
+               foreground_signal, foreground_pid);
+        kill(foreground_pid, foreground_signal);
+        if (foreground_signal == SIGKILL) {
+            foreground_pid = 0;  /* SIGKILL guarantees death */
+        }
+        /* For catchable signals (SIGINT), keep foreground_pid set —
+         * the child may survive if it has a handler */
     } else {
         printf("[SHELL] You pressed Ctrl+C!\n");
     }
@@ -855,8 +861,8 @@ int shell_spawn(int argc, char **argv)
 
     int elf_id = str_to_int(argv[1]);
 
-    if (elf_id < 1 || elf_id > 7) {
-        printf("Invalid elf_id: %d (must be 1-7)\n", elf_id);
+    if (elf_id < 1 || elf_id > 8) {
+        printf("Invalid elf_id: %d (must be 1-8)\n", elf_id);
         return -1;
     }
 
@@ -878,8 +884,9 @@ int shell_test_signal(int argc, char **argv)
     if (argc < 2) {
         printf("Usage: test <test_name>\n");
         printf("Available tests:\n");
-        printf("  sigsegv  - trigger segmentation fault (NULL pointer dereference)\n");
-        printf("  sigint   - continuous print, terminate with Ctrl+C\n");
+        printf("  sigsegv       - trigger segmentation fault (NULL pointer dereference)\n");
+        printf("  sigint        - continuous print, terminate with Ctrl+C\n");
+        printf("  sigint-custom - custom SIGINT handler demo (catches Ctrl+C)\n");
         return -1;
     }
 
@@ -914,10 +921,27 @@ int shell_test_signal(int argc, char **argv)
         }
         printf("Test process spawned (PID %d).\n", pid);
         foreground_pid = pid;
+        foreground_signal = SIGKILL;  /* No handler — force kill */
+        return 0;
+    }
+
+    if (strcmp(argv[1], "sigint-custom") == 0) {
+        printf("=== SIGINT Custom Handler Test ===\n");
+        printf("Spawning process with custom SIGINT handler...\n");
+        printf("Press Ctrl+C — the process will catch it!\n");
+
+        pid_t pid = spawn(8, 1000);  /* elf_id 8 = sigint_custom_test */
+        if (pid == -1) {
+            printf("Failed to spawn sigint-custom test process\n");
+            return -1;
+        }
+        printf("Test process spawned (PID %d).\n", pid);
+        foreground_pid = pid;
+        foreground_signal = SIGINT;  /* Catchable — child has a handler */
         return 0;
     }
 
     printf("Unknown test: '%s'\n", argv[1]);
-    printf("Available tests: sigsegv, sigint\n");
+    printf("Available tests: sigsegv, sigint, sigint-custom\n");
     return -1;
 }
