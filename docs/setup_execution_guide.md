@@ -105,7 +105,7 @@ After boot, wait for the mCertiKOS shell prompt.
 
 Use the shell commands below to verify signal features and shell integration.
 
-## 5. Test Cases (with Sample Inputs)
+## 5. Test Cases
 
 Note: replace placeholder PIDs based on your runtime output.
 
@@ -147,7 +147,7 @@ Expected behavior:
 - Shell handler message appears.
 - Shell stays alive.
 
-Sample output (paste from QEMU):
+Sample output:
 
 ```text
 
@@ -172,7 +172,7 @@ Expected behavior:
 - SIGKILL terminates it immediately.
 - Prompt remains responsive.
 
-Sample output (paste from QEMU):
+Sample output:
 
 ```text
 
@@ -194,7 +194,7 @@ Expected behavior:
 
 - Kill command reports failure or invalid target because process is already dead.
 
-Sample output (paste from QEMU):
+Sample output:
 
 ```text
 
@@ -242,7 +242,7 @@ Expected behavior:
 - Foreground process is interrupted/terminated by shell signal policy.
 - Shell returns to prompt.
 
-Sample output (paste from QEMU):
+Sample output:
 
 ```text
 
@@ -267,7 +267,7 @@ Expected behavior:
 - Program behavior follows handler logic (may continue running).
 - Use kill -9 if force termination is needed.
 
-Sample output (paste from QEMU):
+Sample output:
 
 ```text
 
@@ -276,79 +276,3 @@ Sample output (paste from QEMU):
 
 
 ```
-
-### Test Case 8: Validate kill argument handling
-
-Input:
-
-```text
->: kill -0 2
->: kill -99 2
->: kill -2 999
-```
-
-Expected behavior:
-
-- Invalid signal numbers and invalid PID are rejected cleanly.
-- System remains stable.
-
-Sample output (paste from QEMU):
-
-```text
-
-
-
-
-
-```
-
-## 6. Quick Verification Checklist
-
-Mark each item after successful run:
-
-- [ ] Project builds successfully with make
-- [ ] OS boots in QEMU and shell prompt appears
-- [ ] trap command registers handler
-- [ ] kill command delivers catchable signal
-- [ ] SIGKILL force-kills target process
-- [ ] SIGSEGV test kills faulting process without killing shell
-- [ ] SIGINT default behavior works with Ctrl+C
-- [ ] SIGINT custom handler test works
-- [ ] Invalid kill arguments are handled safely
-
-## 7. Troubleshooting
-
-### Build fails due to missing packages
-
-Run install commands again and ensure gcc-multilib is installed.
-
-### QEMU launch issues
-
-- Verify qemu-kvm is installed.
-- Verify your user is in kvm and libvirt groups.
-- Re-login after usermod group commands.
-
-### Permission or virtualization issues
-
-Check service status:
-
-```bash
-systemctl status libvirtd
-```
-
-If inactive, start it:
-
-```bash
-sudo systemctl start libvirtd
-```
-
-### Shell commands exist but tests do not run as expected
-
-Rebuild from clean state:
-
-```bash
-make clean
-make
-```
-
-Then rerun test cases in order.
