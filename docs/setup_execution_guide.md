@@ -1,3 +1,6 @@
+### Group-B, Team-8
+## 
+
 # Setup and Execution Guide
 
 This document explains how to set up, run, and validate the Signal project on mCertiKOS.
@@ -126,10 +129,10 @@ Expected behavior:
 Sample output (paste from QEMU):
 
 ```text
-
-
-
-
+>:trap 2
+Registering handler for signal 2 at address 40001320...
+[SIGACTION] Setting handler for sig 2: handler=40001320
+Handler registered successfully.
 
 ```
 
@@ -150,10 +153,20 @@ Expected behavior:
 Sample output:
 
 ```text
+>:kill -2 2
+Sending signal 2 to process 2...
+[SIGNAL] Process 2 has pending signals: 0x4
+[SIGNAL] Processing signal 2 for process 2
+[SIGNAL] deliver_signal: pid=2 signum=2 sa=e1ac6c
+[SIGNAL] deliver_signal: sa->sa_handler=40001320
+[SIGNAL] Stack setup: orig_esp=effffb08 orig_eip=40001270 tramp=effffaf4 new_esp=effffaec
+[SIGNAL] Delivering signal 2 to process 2, handler at 40001320
 
-
-
-
+*** Received signal 2 ***
+>:[SIGRETURN] Called by process 2
+[SIGRETURN] saved_esp_addr=effffb00 saved_eip_addr=effffb04
+[SIGRETURN] Restoring context: esp=effffb08 eip=40001270
+Signal sent successfully.
 
 ```
 
@@ -175,10 +188,17 @@ Expected behavior:
 Sample output:
 
 ```text
+>:spawn 1
+Spawning process with elf_id 1...
+Process spawned with PID 7
+>:[ping] ping started.
+[ping] sending msg...
 
-
-
-
+>:kill -9 7
+Sending signal 9 to process 7...
+[SIGNAL] SIGKILL sent to process 7 - terminating immediately
+[SIGNAL] Process 7 terminated by SIGKILL
+Signal sent successfully.
 
 ```
 
@@ -197,10 +217,9 @@ Expected behavior:
 Sample output:
 
 ```text
-
-
-
-
+>:kill -9 7
+Sending signal 9 to process 7...
+Failed to send signal (error: -1)
 
 ```
 
@@ -218,13 +237,26 @@ Expected behavior:
 - Shell and kernel continue running.
 - No full OS panic/halt.
 
-Sample output (paste from QEMU):
+Sample output:
 
 ```text
+>:test sigsegv
+=== SIGSEGV Test ===
+Spawning process that will dereference a NULL pointer...
+Expected: process terminates with 'Segmentation fault' instead of kernel panic.
 
+Test process spawned (PID 8). It should crash gracefully.
+[sigsegv_test] Process started.
+[sigsegv_test] Attempting to dereference NULL pointer...
+[SIGSEGV] Page fault in process 8: va=0x00000000 errno=0x00000007 eip=0x40000037
+[SIGNAL] Process 8 has pending signals: 0x800
+[SIGNAL] Processing signal 11 for process 8
 
+[Process 8] Segmentation fault (signal 11)
+[SIGNAL] Terminating process 8
+[SIGNAL] Process 8 terminated
 
-
+=== OS is still running! Shell is alive. ===
 
 ```
 
@@ -245,10 +277,39 @@ Expected behavior:
 Sample output:
 
 ```text
+>:test sigint
+=== SIGINT Test ===
+Spawning process that prints continuously...
+Press Ctrl+C to terminate it.
 
+Test process spawned (PID 7).
+>:[sigint_test] Process started. Printing continuously...
+[sigint_test] Press Ctrl+C to terminate.
+[sigint_test] Hello World! (0)
+[sigint_test] Hello World! (1)
+[sigint_test] Hello World! (2)
+[sigint_test] Hello World! (3)
+[sigint_test] Hello World! (4)
+[sigint_test] Hello World! (5)
+[sigint_test] Hello World! (6)
+[sigint_test] Hello World! (7)
+[sigint_test] Hello World! (8)
+[sigint_test] Hello World! (9)
+[sigint_test] Hello World! (10)
+^C
+[SIGNAL] Process 2 has pending signals: 0x4
+[SIGNAL] Processing signal 2 for process 2
+[SIGNAL] deliver_signal: pid=2 signum=2 sa=e1ac6c
+[SIGNAL] deliver_signal: sa->sa_handler=40001e80
+[SIGNAL] Stack setup: orig_esp=effffb60 orig_eip=400000f4 tramp=effffb4c new_esp=effffb44
+[SIGNAL] Delivering signal 2 to process 2, handler at 40001e80
 
-
-
+[SHELL] Ctrl+C: sending signal 9 to process 7...
+[SIGNAL] SIGKILL sent to process 7 - terminating immediately
+[SIGNAL] Process 7 terminated by SIGKILL
+[SIGRETURN] Called by process 2
+[SIGRETURN] saved_esp_addr=effffb58 saved_eip_addr=effffb5c
+[SIGRETURN] Restoring context: esp=effffb60 eip=400000f4
 
 ```
 
@@ -270,9 +331,41 @@ Expected behavior:
 Sample output:
 
 ```text
+>:test sigint-custom
+=== SIGINT Custom Handler Test ===
+Spawning process with custom SIGINT handler...
+Press Ctrl+C — the process will catch it!
+Test process spawned (PID 8).
+[SIGACTION] Setting handler for sig 2: handler=40001050
+[sigint_custom] Process started with custom SIGINT handler.
+..........................................................................................
+..........................................................................................
+..........................................................................................
+^C
+[SIGNAL] Process 2 has pending signals: 0x4
+[SIGNAL] Processing signal 2 for process 2
+[SIGNAL] deliver_signal: pid=2 signum=2 sa=e1ac6c
+[SIGNAL] deliver_signal: sa->sa_handler=40001e80
+[SIGNAL] Stack setup: orig_esp=effffb60 orig_eip=400000f4 tramp=effffb4c new_esp=effffb44
+[SIGNAL] Delivering signal 2 to process 2, handler at 40001e80
 
+[SHELL] Ctrl+C: sending signal 2 to process 8...
+[SIGRETURN] Called by process 2
+[SIGRETURN] saved_esp_addr=effffb58 saved_eip_addr=effffb5c
+[SIGRETURN] Restoring context: esp=effffb60 eip=400000f4
+>:[SIGNAL] Process 8 has pending signals: 0x4
+[SIGNAL] Processing signal 2 for process 8
+[SIGNAL] deliver_signal: pid=8 signum=2 sa=e1bddc
+[SIGNAL] deliver_signal: sa->sa_handler=40001050
+[SIGNAL] Stack setup: orig_esp=efffef50 orig_eip=400002a8 tramp=efffef3c new_esp=efffef34
+[SIGNAL] Delivering signal 2 to process 8, handler at 40001050
 
-
-
+YOU CAN'T KILL ME!!
+[SIGRETURN] Called by process 8
+[SIGRETURN] saved_esp_addr=efffef48 saved_eip_addr=efffef4c
+[SIGRETURN] Restoring context: esp=efffef50 eip=400002a8
+..........................................................................................
+..........................................................................................
+..........................................................................................
 
 ```
